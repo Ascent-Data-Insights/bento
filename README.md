@@ -31,18 +31,18 @@ Things being moved. A resource is anything that gets picked up at one location a
 | Resource | Compartment Type | Consumes | Attributes |
 |---|---|---|---|
 | Landscaper (mower operator) | Cab | 1 seat | `skills: [mower_operator]` |
-| Lawn mower | Bed/Trailer | weight, volume | `type: mower` |
-| Bag of mulch | Bed | weight, volume | — |
+| Lawn mower | Bed or Trailer | weight, volume | `type: mower` |
+| 10 bags of mulch | Bed | weight, volume (quantity=10) | — |
 | Robotaxi passenger | Cabin | 1 seat | — |
 | Pallet of frozen pizzas | Refrigerated | weight, volume | — |
 
-The solver doesn't distinguish between people and goods — they're all resources with attributes, pickup/dropoff locations, and capacity consumption. A job site that needs a forklift-certified worker just requires a resource with `skills: [forklift]`.
+The solver doesn't distinguish between people and goods — they're all resources with attributes, pickup/dropoff locations, and capacity consumption. A job site that needs a forklift-certified worker just requires a resource with `skills: [forklift]`. Resources can list multiple compatible compartment types (e.g., a mower fits in a bed or a trailer) and can have a quantity for batch items (e.g., 10 bags of mulch).
 
 ## What the Base Model Handles
 
 - Route vehicles through locations, minimizing the objective
 - Pick up and drop off resources along each route
-- Match resources to compatible compartment types
+- Match resources to compatible compartment types (resources list which compartment types they fit in)
 - Enforce compartment capacity limits at every point in the route
 - Satisfy location resource requirements (skills, equipment, quantities)
 - Allow multiple vehicles to serve the same location when needed
@@ -56,7 +56,10 @@ Structural choices that shape the problem. Each client selects one option per di
 |---|---|
 | **Origin Model** | Single depot · Multi-depot · Depot + intermediate stops |
 | **Fleet Composition** | Homogeneous · Heterogeneous (capabilities vary by vehicle) |
-| **Objective** | Min distance · Min time · Min vehicles · Min cost · Multi-objective |
+
+The **objective** is not a dimension — it's a weighted dict on the client profile. Keys reference named cost matrices (e.g., `"distance"`, `"time"`, `"fuel"`) or the special term `"vehicles"`. Examples: `{"distance": 1.0}` to minimize distance, `{"distance": 0.7, "time": 0.3}` for a multi-objective blend, `{"vehicles": 100, "distance": 1.0}` to minimize fleet size with distance as tiebreaker.
+
+Cost matrices are provided per solve request. Clients can supply any named matrices (distance, time, fuel cost, etc.). If none are provided, a distance matrix is computed from location lat/long coordinates via haversine.
 
 ## Constraint Modules
 
@@ -81,21 +84,21 @@ Three demos proving the model's flexibility across radically different industrie
 ### 1. Grasscutting (Landscaping)
 - **Origin Model**: Single depot (HQ where crew and equipment are stored)
 - **Fleet**: Heterogeneous (trucks with trailers, trucks without, cars for quotes)
-- **Objective**: Min distance
+- **Objective**: `{"distance": 1.0}`
 - **Modules**: Time Windows, Shift Limits, Co-delivery
 - **Key features exercised**: Mixed people + equipment as resources, varying job sizes (1 mower + 1 operator vs. 2 mowers + 1 hedger + 3 operators), quote-only visits (just a person in a car, no equipment)
 
 ### 2. Roofing
 - **Origin Model**: Depot + intermediate stops (leave HQ, pick up materials at warehouse, then to job sites)
 - **Fleet**: Heterogeneous
-- **Objective**: Min distance
+- **Objective**: `{"distance": 1.0}`
 - **Modules**: Time Windows, Shift Limits, Co-delivery
 - **Key features exercised**: Intermediate warehouse stops, heavy materials requiring specific vehicle capacity
 
 ### 3. Robotaxi
 - **Origin Model**: Multi-depot (taxis spread across the city)
 - **Fleet**: Heterogeneous (different battery levels/vehicle sizes)
-- **Objective**: Min time (passenger wait time)
+- **Objective**: `{"time": 1.0}`
 - **Modules**: Time Windows, EV/Fuel
 - **Key features exercised**: No operators (vehicle is autonomous), passengers as resources with unique pickup/dropoff pairs, no return-to-depot requirement, charging station routing
 
@@ -118,12 +121,12 @@ routing/
 │   ├── api/
 │   │   └── routes/            # solve.py, profiles.py
 │   ├── solver/
-│   │   ├── interface.py       # ConstraintModule ABC + ModuleMetadata
+│   │   ├── module.py          # ConstraintModule ABC + ModuleMetadata
 │   │   ├── orchestrator.py    # Composes modules into a solvable model
 │   │   ├── base_model.py      # Core Pyomo model (locations, vehicles, compartments, resources)
 │   │   ├── result_extractor.py
 │   │   ├── exceptions.py
-│   │   ├── dimensions/        # origin_model.py, fleet_composition.py, objective.py
+│   │   ├── dimensions/        # origin_model.py, fleet_composition.py
 │   │   ├── modules/           # time_windows.py, ev_fuel.py, shift_limits.py, etc.
 │   │   └── custom/            # Per-tenant custom constraint scripts
 │   ├── db/

@@ -78,6 +78,47 @@ class TestResource:
         )
         assert r.attributes["skills"] == ["mower", "hedger"]
 
+    def test_multiple_compartment_types(self):
+        r = Resource(
+            id="mower_1",
+            pickup_location_id="depot",
+            dropoff_location_id="site_a",
+            compartment_types=["bed", "trailer"],
+            capacity_consumption={"weight": 150, "volume": 10},
+        )
+        assert r.compartment_types == ["bed", "trailer"]
+
+    def test_empty_compartment_types_rejected(self):
+        with pytest.raises(ValidationError):
+            Resource(
+                id="bad",
+                pickup_location_id="depot",
+                dropoff_location_id="site_a",
+                compartment_types=[],
+                capacity_consumption={"seats": 1},
+            )
+
+    def test_quantity_default(self):
+        r = Resource(
+            id="worker_1",
+            pickup_location_id="depot",
+            dropoff_location_id="site_a",
+            compartment_types=["cab"],
+            capacity_consumption={"seats": 1},
+        )
+        assert r.quantity == 1
+
+    def test_quantity_batch(self):
+        r = Resource(
+            id="mulch_for_site_a",
+            pickup_location_id="depot",
+            dropoff_location_id="site_a",
+            compartment_types=["bed"],
+            capacity_consumption={"weight": 50, "volume": 2},
+            quantity=10,
+        )
+        assert r.quantity == 10
+
 
 class TestSolveRequest:
     def _make_request(self, **overrides):
@@ -106,6 +147,20 @@ class TestSolveRequest:
     def test_empty_vehicles_rejected(self):
         with pytest.raises(ValidationError):
             self._make_request(vehicles=[])
+
+    def test_named_matrices(self):
+        req = self._make_request(
+            matrices={
+                "distance": {"depot": {"depot": 0}},
+                "time": {"depot": {"depot": 0}},
+            }
+        )
+        assert "distance" in req.matrices
+        assert "time" in req.matrices
+
+    def test_no_matrices_default_empty(self):
+        req = self._make_request()
+        assert req.matrices == {}
 
 
 class TestSolveResponse:

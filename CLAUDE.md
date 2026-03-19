@@ -19,14 +19,15 @@ Four concepts are foundational and handled by the base model:
 - **Locations**: Places on the map (depots, job sites, warehouses, charging stations)
 - **Vehicles**: Move between locations, contain one or more compartments
 - **Compartments**: Spaces within vehicles with capacity dimensions (weight, volume, seats, etc.)
-- **Resources**: Things being moved — people AND goods. Each has a pickup location, dropoff location, compartment type, capacity consumption, and optional attributes (skills, certifications, etc.)
+- **Resources**: Things being moved — people AND goods. Each has a pickup location, dropoff location, compatible compartment types (list), capacity consumption, quantity, and optional attributes (skills, certifications, etc.)
 
 People and goods are both resources. A person with a skill is a resource with an attribute. A job site requiring a forklift operator is a location requiring a resource with `skills: [forklift]`. The solver doesn't distinguish people from goods.
 
 ## Architecture Principles
 
 - **The base model is powerful.** It handles routing, resource pickup/dropoff, compartment capacity, resource-to-location requirements, and multi-vehicle visits. Modules only add genuinely optional constraints.
-- **Dimensions shape the model structure** (origin model, fleet composition, objective). They are NOT modules — they run during model construction and change sets/variables.
+- **Dimensions shape the model structure** (origin model, fleet composition). They are NOT modules — they run during model construction and change sets/variables.
+- **Objective is a weighted dict** on the profile, not a dimension. Keys are matrix names (e.g., `"distance"`, `"time"`) or `"vehicles"`. The solver builds `sum(weight * sum(matrix))` for each term.
 - **Modules add constraints to an already-built model.** They follow the ConstraintModule ABC interface. Built-in modules and custom per-tenant scripts are architecturally identical.
 - **Custom constraints are Python scripts** in `backend/solver/custom/`, written by the team (not auto-generated). They follow the same module interface.
 
@@ -34,7 +35,8 @@ People and goods are both resources. A person with a skill is a resource with an
 
 - **Origin Model**: single_depot, multi_depot, depot_intermediate
 - **Fleet Composition**: homogeneous, heterogeneous
-- **Objective**: min_distance, min_time, min_vehicles, min_cost, multi_objective
+
+Objective is NOT a dimension — it's a weighted dict on the client profile (e.g., `{"distance": 1.0}` or `{"distance": 0.7, "time": 0.3}`).
 
 ## Modules (composable constraint toggles)
 
@@ -67,7 +69,7 @@ Three scenarios to prove flexibility:
 
 ## Important Patterns
 
-- **Module interface (ABC)**: 4 abstract methods (`get_metadata()`, `get_data_schema()`, `validate()`, `add_to_model()`) + 1 optional with default (`extract_results()` returns `{}` by default)
+- **Module ABC** in `backend/solver/module.py`: 4 abstract methods (`get_metadata()`, `get_data_schema()`, `validate()`, `add_to_model()`) + 1 optional with default (`extract_results()` returns `{}` by default)
 - **Orchestrator pipeline**: resolve modules → validate dependencies/conflicts → validate data schemas → compute matrices → build base model → apply dimensions → semantic validation → apply modules → solve → extract results
 - **Profile validation**: All validation is front-loaded before the solver runs.
 - **Module ordering**: Topological sort on declared dependencies, profile order as tiebreaker.

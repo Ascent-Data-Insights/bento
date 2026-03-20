@@ -132,6 +132,7 @@ class TestSolveRequest:
                 )
             ],
             resources=[],
+            matrices={"distance": {"depot": {"depot": 0.0}}},
         )
         defaults.update(overrides)
         return SolveRequest(**defaults)
@@ -158,9 +159,9 @@ class TestSolveRequest:
         assert "distance" in req.matrices
         assert "time" in req.matrices
 
-    def test_no_matrices_default_empty(self):
-        req = self._make_request()
-        assert req.matrices == {}
+    def test_empty_matrices_rejected(self):
+        with pytest.raises(ValidationError):
+            self._make_request(matrices={})
 
 
 class TestSolveResponse:

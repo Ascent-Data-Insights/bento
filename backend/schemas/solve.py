@@ -71,7 +71,7 @@ class SolveRequest(BaseModel):
     locations: list[Location] = Field(..., min_length=1)
     vehicles: list[Vehicle] = Field(..., min_length=1)
     resources: list[Resource]
-    matrices: dict[str, dict[str, dict[str, float]]] = {}
+    matrices: dict[str, dict[str, dict[str, float]]] = Field(..., min_length=1)
     module_data: dict[str, Any] = {}
 
 

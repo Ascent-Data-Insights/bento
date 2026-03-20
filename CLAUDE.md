@@ -87,3 +87,10 @@ Three scenarios to prove flexibility:
 - Don't use Pyomo's AbstractModel — use ConcreteModel for clarity and debuggability.
 - Don't build UI tooling for custom constraint creation — those are hand-written Python by the team.
 - Don't treat people and goods as fundamentally different — they're both resources.
+
+## Known Limitations
+
+- No mid-route depot reloading — vehicles visit depot at start and end only. Use multiple vehicles instead.
+- MTZ subtour elimination doesn't scale past ~50-100 locations.
+- Compartment capacity is additive (linear sum), not geometric bin packing.
+- Matrices (distance, time, etc.) must be provided — no auto-computation from coordinates.

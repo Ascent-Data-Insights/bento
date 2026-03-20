@@ -48,6 +48,12 @@ The solver doesn't distinguish between people and goods — they're all resource
 - Allow multiple vehicles to serve the same location when needed
 - Subtour elimination (MTZ formulation)
 
+### Known Limitations
+
+- **No mid-route depot reloading.** Each vehicle visits the depot once at the start and once at the end. If a vehicle can't carry enough for all its stops in one trip, the solver assigns multiple vehicles rather than having one vehicle return to reload. Mid-route reloading (depot→A→depot→B→depot) is a future enhancement.
+- **MTZ subtour elimination scales poorly** past ~50-100 locations. Fine for the demo; production would need lazy constraint generation.
+- **Compartment capacity is additive.** Checked as a linear sum, not geometric bin packing. For real-world packing concerns, set conservative capacity values or add a custom module.
+
 ## Dimensions
 
 Structural choices that shape the problem. Each client selects one option per dimension:
@@ -110,6 +116,10 @@ Three demos proving the model's flexibility across radically different industrie
 | **Backend API** | FastAPI (Python) |
 | **Frontend** | React |
 | **Database** | PostgreSQL (shared multi-tenant) |
+
+## System Dependencies
+
+- **CBC solver**: Required for optimization. Install via `sudo apt install coinor-cbc` (Ubuntu/Debian). Not a Python package — it's a system binary that Pyomo calls. For production, include in a Dockerfile.
 
 ## Project Structure
 

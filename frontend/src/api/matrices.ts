@@ -1,7 +1,7 @@
 import type { Location, Route } from '../types/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-const OSRM_BASE = 'https://router.project-osrm.org'
+const OSRM_BASE = import.meta.env.VITE_OSRM_URL || 'https://router.project-osrm.org'
 
 export async function computeMatrices(
   locations: Location[]

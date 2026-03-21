@@ -145,7 +145,7 @@ export function RouteMap({
     }
     fetchAll()
     return () => { cancelled = true }
-  }, [routes])
+  }, [routes, locations])
 
   // Build route polyline data
   const routeLines = (routes || []).map((route, idx) => {

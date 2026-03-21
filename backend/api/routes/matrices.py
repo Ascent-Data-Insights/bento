@@ -113,8 +113,8 @@ async def compute_matrices(request: MatrixRequest) -> MatrixResponse:
                     status_code=502,
                     detail=f"OSRM returned no route between '{from_loc.id}' and '{to_loc.id}'.",
                 )
-            # meters -> km, rounded to 1 decimal
-            distance_matrix[from_loc.id][to_loc.id] = round(dist_raw / 1000, 1)
+            # meters -> miles, rounded to 1 decimal
+            distance_matrix[from_loc.id][to_loc.id] = round(dist_raw / 1609.34, 1)
             # seconds -> minutes, rounded to 1 decimal
             time_matrix[from_loc.id][to_loc.id] = round(dur_raw / 60, 1)
 

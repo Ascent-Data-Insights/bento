@@ -60,7 +60,7 @@ class TestMatricesEndpoint:
             data = response.json()
             assert "distance" in data["matrices"]
             assert "time" in data["matrices"]
-            assert data["matrices"]["distance"]["a"]["b"] == 5.0  # 5000m -> 5.0km
+            assert data["matrices"]["distance"]["a"]["b"] == 3.1  # 5000m -> 3.1mi
             assert data["matrices"]["time"]["a"]["b"] == 5.0  # 300s -> 5.0min
 
     def test_matrices_too_few_locations(self, client):

@@ -192,7 +192,7 @@ function PostSolveView({
           <span className="text-xs opacity-70">{routes.length} routes</span>
         </div>
         <div className="text-3xl font-bold font-heading">
-          {solveResult.objective_value?.toFixed(1)} <span className="text-base font-normal opacity-70">km</span>
+          {solveResult.objective_value?.toFixed(1)} <span className="text-base font-normal opacity-70">mi</span>
         </div>
         <div className="text-xs opacity-60 mt-0.5">Total distance</div>
       </div>
@@ -243,7 +243,7 @@ function PostSolveView({
                     {vehicleLabels[route.vehicle_id] || route.vehicle_id}
                   </span>
                   <span className="ml-auto text-xs text-gray-400">
-                    {route.total_distance.toFixed(1)} km
+                    {route.total_distance.toFixed(1)} mi
                   </span>
                 </div>
 

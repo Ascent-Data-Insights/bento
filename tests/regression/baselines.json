@@ -1,0 +1,22 @@
+{
+  "grasscutting_basic": {
+    "objective_value": 27.0,
+    "vehicles_used": 2
+  },
+  "grasscutting_co_delivery": {
+    "objective_value": 18.0,
+    "vehicles_used": 1
+  },
+  "grasscutting_full": {
+    "objective_value": 18.0,
+    "vehicles_used": 1
+  },
+  "grasscutting_time_windows": {
+    "objective_value": 27.0,
+    "vehicles_used": 2
+  },
+  "multi_vehicle_scaling": {
+    "objective_value": 38.0,
+    "vehicles_used": 2
+  }
+}

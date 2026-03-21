@@ -1,8 +1,17 @@
 'use client'
 
 import * as Headless from '@headlessui/react'
-import React, { useState } from 'react'
+import React, { createContext, useContext, useState } from 'react'
 import { NavbarItem } from './navbar'
+
+const SidebarCollapseContext = createContext<{
+  collapsed: boolean
+  setCollapsed: (collapsed: boolean) => void
+}>({ collapsed: false, setCollapsed: () => {} })
+
+export function useSidebarCollapse() {
+  return useContext(SidebarCollapseContext)
+}
 
 function OpenMenuIcon() {
   return (
@@ -16,6 +25,22 @@ function CloseMenuIcon() {
   return (
     <svg data-slot="icon" viewBox="0 0 20 20" aria-hidden="true">
       <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+    </svg>
+  )
+}
+
+function CollapseIcon() {
+  return (
+    <svg data-slot="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="size-5">
+      <path fillRule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clipRule="evenodd" />
+    </svg>
+  )
+}
+
+function ExpandIcon() {
+  return (
+    <svg data-slot="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="size-5">
+      <path fillRule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
     </svg>
   )
 }
@@ -50,33 +75,47 @@ export function SidebarLayout({
   children,
 }: React.PropsWithChildren<{ navbar: React.ReactNode; sidebar: React.ReactNode }>) {
   let [showSidebar, setShowSidebar] = useState(false)
+  let [collapsed, setCollapsed] = useState(false)
 
   return (
-    <div className="relative isolate flex min-h-svh w-full bg-white max-lg:flex-col lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950">
-      {/* Sidebar on desktop */}
-      <div className="fixed inset-y-0 left-0 w-64 max-lg:hidden">{sidebar}</div>
-
-      {/* Sidebar on mobile */}
-      <MobileSidebar open={showSidebar} close={() => setShowSidebar(false)}>
-        {sidebar}
-      </MobileSidebar>
-
-      {/* Navbar on mobile */}
-      <header className="flex items-center px-4 lg:hidden">
-        <div className="py-2.5">
-          <NavbarItem onClick={() => setShowSidebar(true)} aria-label="Open navigation">
-            <OpenMenuIcon />
-          </NavbarItem>
+    <SidebarCollapseContext.Provider value={{ collapsed, setCollapsed }}>
+      <div className="relative isolate flex min-h-svh w-full bg-white max-lg:flex-col lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950">
+        {/* Sidebar on desktop */}
+        <div
+          className={`fixed inset-y-0 left-0 max-lg:hidden transition-all duration-200 ${collapsed ? 'w-16' : 'w-64'}`}
+        >
+          {sidebar}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="absolute -right-3 top-8 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-zinc-950/10 hover:bg-zinc-50 transition"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? <ExpandIcon /> : <CollapseIcon />}
+          </button>
         </div>
-        <div className="min-w-0 flex-1">{navbar}</div>
-      </header>
 
-      {/* Content */}
-      <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 lg:pl-64">
-        <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
-          <div className="mx-auto max-w-6xl">{children}</div>
-        </div>
-      </main>
-    </div>
+        {/* Sidebar on mobile */}
+        <MobileSidebar open={showSidebar} close={() => setShowSidebar(false)}>
+          {sidebar}
+        </MobileSidebar>
+
+        {/* Navbar on mobile */}
+        <header className="flex items-center px-4 lg:hidden">
+          <div className="py-2.5">
+            <NavbarItem onClick={() => setShowSidebar(true)} aria-label="Open navigation">
+              <OpenMenuIcon />
+            </NavbarItem>
+          </div>
+          <div className="min-w-0 flex-1">{navbar}</div>
+        </header>
+
+        {/* Content */}
+        <main className={`flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 transition-all duration-200 ${collapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
+          <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
+            <div className="mx-auto max-w-6xl">{children}</div>
+          </div>
+        </main>
+      </div>
+    </SidebarCollapseContext.Provider>
   )
 }

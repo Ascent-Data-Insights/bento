@@ -1,7 +1,7 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { branding } from '../config/branding'
-import { SidebarLayout } from '../components/sidebar-layout'
+import { SidebarLayout, useSidebarCollapse } from '../components/sidebar-layout'
 import {
   Sidebar,
   SidebarBody,
@@ -50,10 +50,11 @@ const navItems = [
   },
 ]
 
-export function AppLayout() {
+function AppSidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { logout } = useAuth()
+  const { collapsed } = useSidebarCollapse()
 
   const handleLogout = () => {
     logout()
@@ -61,51 +62,61 @@ export function AppLayout() {
   }
 
   return (
+    <Sidebar>
+      <SidebarHeader>
+        {collapsed ? (
+          <div className="flex justify-center px-2">
+            <span className="font-heading text-lg font-bold text-brand-primary">B</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 px-2">
+            <img src={branding.logo} alt={branding.company} className="h-8" />
+            <span className="font-heading text-lg font-semibold text-brand-primary">
+              {branding.name}
+            </span>
+          </div>
+        )}
+      </SidebarHeader>
+      <SidebarBody>
+        <SidebarSection>
+          {navItems.map((item) => (
+            <SidebarItem
+              key={item.href}
+              href={item.href}
+              current={location.pathname === item.href}
+            >
+              {item.icon}
+              {!collapsed && <SidebarLabel>{item.label}</SidebarLabel>}
+            </SidebarItem>
+          ))}
+        </SidebarSection>
+      </SidebarBody>
+      <SidebarFooter>
+        <Dropdown>
+          <DropdownButton as={SidebarItem}>
+            <Avatar initials="JD" className="size-6 bg-brand-secondary text-white text-xs" />
+            {!collapsed && <SidebarLabel>Jane Doe</SidebarLabel>}
+          </DropdownButton>
+          <DropdownMenu anchor="top start" className="min-w-48">
+            <DropdownItem onClick={handleLogout}>
+              <span>Sign out</span>
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
+      </SidebarFooter>
+    </Sidebar>
+  )
+}
+
+export function AppLayout() {
+  return (
     <SidebarLayout
       navbar={
         <Navbar>
           <NavbarSpacer />
         </Navbar>
       }
-      sidebar={
-        <Sidebar>
-          <SidebarHeader>
-            <div className="flex items-center gap-3 px-2">
-              <img src={branding.logo} alt={branding.company} className="h-8" />
-              <span className="font-heading text-lg font-semibold text-brand-primary">
-                {branding.name}
-              </span>
-            </div>
-          </SidebarHeader>
-          <SidebarBody>
-            <SidebarSection>
-              {navItems.map((item) => (
-                <SidebarItem
-                  key={item.href}
-                  href={item.href}
-                  current={location.pathname === item.href}
-                >
-                  {item.icon}
-                  <SidebarLabel>{item.label}</SidebarLabel>
-                </SidebarItem>
-              ))}
-            </SidebarSection>
-          </SidebarBody>
-          <SidebarFooter>
-            <Dropdown>
-              <DropdownButton as={SidebarItem}>
-                <Avatar initials="JD" className="size-6 bg-brand-secondary text-white text-xs" />
-                <SidebarLabel>Jane Doe</SidebarLabel>
-              </DropdownButton>
-              <DropdownMenu anchor="top start" className="min-w-48">
-                <DropdownItem onClick={handleLogout}>
-                  <span>Sign out</span>
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-          </SidebarFooter>
-        </Sidebar>
-      }
+      sidebar={<AppSidebar />}
     >
       <Outlet />
     </SidebarLayout>

@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import type { Location, Route } from '../types/api'
 import { getRouteColor } from '../utils/route-colors'
 import { locationLabels, locationDescriptions, formatAttributeValue } from '../data/grasscutting-demo'
+import { fetchRouteGeometry } from '../api/matrices'
 
 // Custom marker icons using divIcon (no image asset issues)
 function createMarkerIcon(color: string, size: number = 12, pulse: boolean = false) {
@@ -46,6 +47,45 @@ function FitBounds({ locations }: { locations: Location[] }) {
   return null
 }
 
+// Component to fit bounds to a selected route
+function FitToRoute({
+  selectedRoute,
+  routeLines,
+  roadGeometries,
+}: {
+  selectedRoute: string | null
+  routeLines: { vehicleId: string; coords: [number, number][] }[]
+  roadGeometries: Record<string, [number, number][]>
+}) {
+  const map = useMap()
+  const prevSelected = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (selectedRoute === prevSelected.current) return
+    prevSelected.current = selectedRoute
+
+    if (!selectedRoute) {
+      // Deselected — zoom back out to fit all routes
+      const allCoords = routeLines.flatMap((r) => r.coords)
+      if (allCoords.length > 0) {
+        map.flyToBounds(L.latLngBounds(allCoords), { padding: [50, 50], duration: 0.6 })
+      }
+      return
+    }
+
+    // Use road geometry if available, otherwise the stop coords
+    const coords = roadGeometries[selectedRoute]
+      || routeLines.find((r) => r.vehicleId === selectedRoute)?.coords
+      || []
+
+    if (coords.length > 0) {
+      map.flyToBounds(L.latLngBounds(coords), { padding: [60, 60], duration: 0.6 })
+    }
+  }, [selectedRoute, routeLines, roadGeometries, map])
+
+  return null
+}
+
 // Component to fly to a location
 function FlyToLocation({ locationId, locations }: { locationId: string | null; locations: Location[] }) {
   const map = useMap()
@@ -79,10 +119,38 @@ export function RouteMap({
   focusLocationId,
 }: RouteMapProps) {
   const locationMap = new Map(locations.map((l) => [l.id, l]))
+  const [roadGeometries, setRoadGeometries] = useState<Record<string, [number, number][]>>({})
+
+  // Fetch road geometries when routes change
+  useEffect(() => {
+    if (!routes || routes.length === 0) {
+      setRoadGeometries({})
+      return
+    }
+
+    let cancelled = false
+    const fetchAll = async () => {
+      const geometries: Record<string, [number, number][]> = {}
+      await Promise.all(
+        routes.map(async (route) => {
+          const coords = await fetchRouteGeometry(route, locationMap)
+          if (!cancelled) {
+            geometries[route.vehicle_id] = coords
+          }
+        })
+      )
+      if (!cancelled) {
+        setRoadGeometries(geometries)
+      }
+    }
+    fetchAll()
+    return () => { cancelled = true }
+  }, [routes])
 
   // Build route polyline data
   const routeLines = (routes || []).map((route, idx) => {
-    const coords: [number, number][] = route.stops
+    // Use road geometry if available, fall back to straight lines
+    const coords = roadGeometries[route.vehicle_id] || route.stops
       .map((stop) => {
         const loc = locationMap.get(stop.location_id)
         return loc ? [loc.latitude, loc.longitude] as [number, number] : null
@@ -119,6 +187,7 @@ export function RouteMap({
       />
       <FitBounds locations={locations} />
       <FlyToLocation locationId={focusLocationId ?? null} locations={locations} />
+      <FitToRoute selectedRoute={selectedRoute ?? null} routeLines={routeLines} roadGeometries={roadGeometries} />
 
       {/* Route polylines (unselected first, selected on top) */}
       {routeLines

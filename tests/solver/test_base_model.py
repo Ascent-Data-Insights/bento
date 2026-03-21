@@ -66,29 +66,34 @@ def grasscutting_vehicles():
 def grasscutting_resources():
     return [
         Resource(
-            id="worker_1", pickup_location_id="depot", dropoff_location_id="site_a",
+            id="worker_1", pickup_location_id="depot",
             compartment_types=["cab"], capacity_consumption={"seats": 1},
-            attributes={"skill": "mower_operator"},
+            attributes={"skill": "mower_operator"}, stays_with_vehicle=True,
         ),
         Resource(
-            id="worker_2", pickup_location_id="depot", dropoff_location_id="site_b",
+            id="worker_2", pickup_location_id="depot",
             compartment_types=["cab"], capacity_consumption={"seats": 1},
-            attributes={"skill": "mower_operator"},
+            attributes={"skill": "mower_operator"}, stays_with_vehicle=True,
         ),
         Resource(
-            id="worker_3", pickup_location_id="depot", dropoff_location_id="site_c",
+            id="worker_3", pickup_location_id="depot",
             compartment_types=["cab"], capacity_consumption={"seats": 1},
-            attributes={"skill": "mower_operator"},
+            attributes={"skill": "mower_operator"}, stays_with_vehicle=True,
         ),
         Resource(
-            id="mower_1", pickup_location_id="depot", dropoff_location_id="site_a",
+            id="mower_1", pickup_location_id="depot",
             compartment_types=["bed"], capacity_consumption={"weight": 100, "volume": 8},
-            attributes={"type": "mower"},
+            attributes={"type": "mower"}, stays_with_vehicle=True,
         ),
         Resource(
-            id="mower_2", pickup_location_id="depot", dropoff_location_id="site_b",
+            id="mower_2", pickup_location_id="depot",
             compartment_types=["bed"], capacity_consumption={"weight": 100, "volume": 8},
-            attributes={"type": "mower"},
+            attributes={"type": "mower"}, stays_with_vehicle=True,
+        ),
+        Resource(
+            id="mulch_site_a", pickup_location_id="depot", dropoff_location_id="site_a",
+            compartment_types=["bed"], capacity_consumption={"weight": 50, "volume": 3},
+            quantity=2,
         ),
     ]
 
@@ -207,13 +212,15 @@ class TestResourceMatchesRequirement:
 
 class TestPrecomputeRequirementSatisfiers:
     def test_grasscutting(self, grasscutting_locations, grasscutting_resources):
-        satisfiers = _precompute_requirement_satisfiers(grasscutting_locations, grasscutting_resources)
-        # site_a req 0: skill=mower_operator AND dropoff=site_a -> worker_1 only
-        assert set(satisfiers[("site_a", 0)]) == {"worker_1"}
-        # site_a req 1: type=mower AND dropoff=site_a -> mower_1 only
-        assert set(satisfiers[("site_a", 1)]) == {"mower_1"}
-        # site_c req 0: skill=mower_operator AND dropoff=site_c -> worker_3 only
-        assert set(satisfiers[("site_c", 0)]) == {"worker_3"}
+        consumed, swv = _precompute_requirement_satisfiers(grasscutting_locations, grasscutting_resources)
+        # site_a req 0: skill=mower_operator -> swv workers (all 3 match attributes, no dropoff filter)
+        assert set(swv[("site_a", 0)]) == {"worker_1", "worker_2", "worker_3"}
+        # site_a req 1: type=mower -> swv mowers
+        assert set(swv[("site_a", 1)]) == {"mower_1", "mower_2"}
+        # site_c req 0: skill=mower_operator -> swv workers
+        assert set(swv[("site_c", 0)]) == {"worker_1", "worker_2", "worker_3"}
+        # No consumed satisfiers for mower_operator requirements (workers are swv)
+        assert consumed.get(("site_a", 0), []) == []
 
 
 class TestGetVisitLocations:
@@ -235,7 +242,7 @@ class TestBuildBaseModel:
         assert set(model.N) == {"depot", "site_a", "site_b", "site_c"}
         assert set(model.D) == {"depot"}
         assert set(model.V) == {"truck_1", "truck_2"}
-        assert len(list(model.R)) == 5
+        assert len(list(model.R)) == 6
         assert set(model.CT) == {"cab", "bed"}
         assert "seats" in set(model.CAP_DIMS)
         assert "weight" in set(model.CAP_DIMS)
@@ -249,6 +256,7 @@ class TestBuildBaseModel:
         assert hasattr(model, 'z')
         assert hasattr(model, 'w')
         assert hasattr(model, 'vehicle_used')
+        assert hasattr(model, 'serves_qty')
 
     def test_y_bounds(self, grasscutting_request, grasscutting_profile):
         model = build_base_model(grasscutting_request, grasscutting_profile)
@@ -311,6 +319,19 @@ class TestBuildBaseModel:
         with pytest.raises(ValidationError):
             build_base_model(grasscutting_request, profile)
 
+    def test_serves_qty_exists(self, grasscutting_request, grasscutting_profile):
+        model = build_base_model(grasscutting_request, grasscutting_profile)
+        assert hasattr(model, 'serves_qty')
+        assert hasattr(model, 'SERVES_SET')
+        # Check that serves_set contains entries for swv resources at required locations
+        serves_entries = list(model.SERVES_SET)
+        assert len(serves_entries) > 0
+        # All entries should be (vehicle_id, swv_resource_id, location_id) tuples
+        for v, r, i in serves_entries:
+            assert v in {"truck_1", "truck_2"}
+            assert r in {"worker_1", "worker_2", "worker_3", "mower_1", "mower_2"}
+            assert i in {"site_a", "site_b", "site_c"}
+
 
 # Only run solve test if CBC is available
 @pytest.fixture
@@ -335,3 +356,94 @@ class TestBuildBaseModelSolves:
         # At least one vehicle is used
         total_used = sum(pyo.value(model.vehicle_used[v]) for v in model.V)
         assert total_used >= 1
+
+    def test_swv_worker_visits_multiple_sites(self, cbc_available):
+        """A single swv worker must visit 2 sites — verifies the worker stays on the vehicle."""
+        from backend.schemas.solve import ResourceRequirement
+        locations = [
+            Location(id="depot", latitude=40.71, longitude=-74.00, service_time=0),
+            Location(id="site_a", latitude=40.72, longitude=-74.00, service_time=30,
+                     required_resources=[ResourceRequirement(attributes={"skill": "mower_operator"}, quantity=1)]),
+            Location(id="site_b", latitude=40.73, longitude=-74.00, service_time=30,
+                     required_resources=[ResourceRequirement(attributes={"skill": "mower_operator"}, quantity=1)]),
+        ]
+        vehicles = [
+            Vehicle(id="truck_1", start_location_id="depot", end_location_id="depot",
+                    compartments=[Compartment(type="cab", capacity={"seats": 2})])
+        ]
+        resources = [
+            Resource(id="worker_1", pickup_location_id="depot",
+                     compartment_types=["cab"], capacity_consumption={"seats": 1},
+                     attributes={"skill": "mower_operator"}, stays_with_vehicle=True),
+        ]
+        matrices = {
+            "distance": {
+                "depot": {"depot": 0, "site_a": 5, "site_b": 8},
+                "site_a": {"depot": 5, "site_a": 0, "site_b": 4},
+                "site_b": {"depot": 8, "site_a": 4, "site_b": 0},
+            }
+        }
+        request = SolveRequest(locations=locations, vehicles=vehicles, resources=resources, matrices=matrices)
+        profile = ClientProfile(
+            tenant_id="test", name="Test",
+            dimensions=DimensionSelections(origin_model=OriginModel.SINGLE_DEPOT, fleet_composition=FleetComposition.HETEROGENEOUS),
+            objective={"distance": 1.0},
+        )
+        model = build_base_model(request, profile)
+        results = cbc_available.solve(model, tee=False)
+        assert results.solver.termination_condition == pyo.TerminationCondition.optimal
+
+        # Worker is on truck_1
+        assert pyo.value(model.y["truck_1", "worker_1"]) == 1
+
+        # Truck visits both sites
+        visited = set()
+        for (i, j) in model.A:
+            if pyo.value(model.x["truck_1", i, j]) > 0.5:
+                visited.add(j)
+        assert "site_a" in visited
+        assert "site_b" in visited
+
+    def test_mixed_consumed_and_swv(self, cbc_available):
+        """SWV worker + consumed mulch delivered to the same site."""
+        from backend.schemas.solve import ResourceRequirement
+        locations = [
+            Location(id="depot", latitude=40.71, longitude=-74.00, service_time=0),
+            Location(id="site_a", latitude=40.72, longitude=-74.00, service_time=30,
+                     required_resources=[
+                         ResourceRequirement(attributes={"skill": "mower_operator"}, quantity=1),
+                     ]),
+        ]
+        vehicles = [
+            Vehicle(id="truck_1", start_location_id="depot", end_location_id="depot",
+                    compartments=[
+                        Compartment(type="cab", capacity={"seats": 2}),
+                        Compartment(type="bed", capacity={"weight": 500, "volume": 30}),
+                    ])
+        ]
+        resources = [
+            Resource(id="worker_1", pickup_location_id="depot",
+                     compartment_types=["cab"], capacity_consumption={"seats": 1},
+                     attributes={"skill": "mower_operator"}, stays_with_vehicle=True),
+            Resource(id="mulch_1", pickup_location_id="depot", dropoff_location_id="site_a",
+                     compartment_types=["bed"], capacity_consumption={"weight": 100, "volume": 5}),
+        ]
+        matrices = {
+            "distance": {
+                "depot": {"depot": 0, "site_a": 5},
+                "site_a": {"depot": 5, "site_a": 0},
+            }
+        }
+        request = SolveRequest(locations=locations, vehicles=vehicles, resources=resources, matrices=matrices)
+        profile = ClientProfile(
+            tenant_id="test", name="Test",
+            dimensions=DimensionSelections(origin_model=OriginModel.SINGLE_DEPOT, fleet_composition=FleetComposition.HETEROGENEOUS),
+            objective={"distance": 1.0},
+        )
+        model = build_base_model(request, profile)
+        results = cbc_available.solve(model, tee=False)
+        assert results.solver.termination_condition == pyo.TerminationCondition.optimal
+
+        # Worker rides with truck, mulch delivered
+        assert pyo.value(model.y["truck_1", "worker_1"]) == 1
+        assert pyo.value(model.y["truck_1", "mulch_1"]) == 1

@@ -62,19 +62,32 @@ def _resource_matches_requirement(resource: Resource, requirement: ResourceRequi
 def _precompute_requirement_satisfiers(
     locations: list[Location],
     resources: list[Resource],
-) -> dict[tuple[str, int], list[str]]:
-    """For each (location_id, requirement_index), find which resource IDs can satisfy it."""
-    result: dict[tuple[str, int], list[str]] = {}
+) -> tuple[dict[tuple[str, int], list[str]], dict[tuple[str, int], list[str]]]:
+    """Returns (consumed_satisfiers, swv_satisfiers).
+
+    consumed_satisfiers: resources where stays_with_vehicle=False AND dropoff_location_id==loc.id AND attributes match
+    swv_satisfiers: resources where stays_with_vehicle=True AND attributes match (no dropoff filter)
+    """
+    consumed: dict[tuple[str, int], list[str]] = {}
+    swv: dict[tuple[str, int], list[str]] = {}
     for loc in locations:
         if not loc.required_resources:
             continue
         for idx, req in enumerate(loc.required_resources):
-            satisfiers = [
+            consumed_ids = [
                 r.id for r in resources
-                if r.dropoff_location_id == loc.id and _resource_matches_requirement(r, req)
+                if not r.stays_with_vehicle
+                and r.dropoff_location_id == loc.id
+                and _resource_matches_requirement(r, req)
             ]
-            result[(loc.id, idx)] = satisfiers
-    return result
+            swv_ids = [
+                r.id for r in resources
+                if r.stays_with_vehicle
+                and _resource_matches_requirement(r, req)
+            ]
+            consumed[(loc.id, idx)] = consumed_ids
+            swv[(loc.id, idx)] = swv_ids
+    return consumed, swv
 
 
 def _get_visit_locations(
@@ -94,7 +107,8 @@ def _get_visit_locations(
             visit.add(loc.id)
     for r in resources:
         visit.add(r.pickup_location_id)
-        visit.add(r.dropoff_location_id)
+        if r.dropoff_location_id is not None:
+            visit.add(r.dropoff_location_id)
     return visit
 
 
@@ -115,8 +129,10 @@ def build_base_model(request: SolveRequest, profile: ClientProfile) -> pyo.Concr
     for v in request.vehicles:
         vehicle_end_map[v.id] = v.end_location_id if v.end_location_id is not None else v.start_location_id
 
+    consumed_resource_ids = {r.id for r in request.resources if not r.stays_with_vehicle}
+    swv_resource_ids = {r.id for r in request.resources if r.stays_with_vehicle}
     visit_locations = _get_visit_locations(request.locations, request.resources, depots)
-    requirement_satisfiers = _precompute_requirement_satisfiers(request.locations, request.resources)
+    consumed_satisfiers, swv_satisfiers = _precompute_requirement_satisfiers(request.locations, request.resources)
 
     # Lookup dicts
     resource_by_id: dict[str, Resource] = {r.id: r for r in request.resources}
@@ -151,7 +167,7 @@ def build_base_model(request: SolveRequest, profile: ClientProfile) -> pyo.Concr
     for r in request.resources:
         if r.pickup_location_id not in location_id_set:
             errors.append(f"Resource '{r.id}' pickup_location_id '{r.pickup_location_id}' not in locations.")
-        if r.dropoff_location_id not in location_id_set:
+        if r.dropoff_location_id is not None and r.dropoff_location_id not in location_id_set:
             errors.append(f"Resource '{r.id}' dropoff_location_id '{r.dropoff_location_id}' not in locations.")
 
     # Vehicle start/end locations must exist
@@ -215,7 +231,10 @@ def build_base_model(request: SolveRequest, profile: ClientProfile) -> pyo.Concr
     )
     model.resource_dropoff = pyo.Param(
         model.R,
-        initialize={r.id: r.dropoff_location_id for r in request.resources},
+        initialize={
+            r.id: (r.dropoff_location_id if r.dropoff_location_id is not None else r.pickup_location_id)
+            for r in request.resources
+        },
         within=model.N,
     )
     model.resource_quantity = pyo.Param(
@@ -392,8 +411,10 @@ def build_base_model(request: SolveRequest, profile: ClientProfile) -> pyo.Concr
 
         model.pickup_routing = pyo.Constraint(model.V, model.R, rule=pickup_route_rule)
 
-        # C13: Resource routing — dropoff
-        def dropoff_route_rule(model: pyo.ConcreteModel, v: str, r: str) -> pyo.Expression:
+        # C13: Resource routing — dropoff (skip for stays-with-vehicle resources)
+        def dropoff_route_rule(model: pyo.ConcreteModel, v: str, r: str) -> pyo.Expression | type:
+            if r in swv_resource_ids:
+                return pyo.Constraint.Skip
             d = pyo.value(model.resource_dropoff[r])
             qty = pyo.value(model.resource_quantity[r])
             if d == pyo.value(model.vehicle_end[v]):
@@ -415,8 +436,10 @@ def build_base_model(request: SolveRequest, profile: ClientProfile) -> pyo.Concr
 
         model.w_upper = pyo.Constraint(model.V, model.R, rule=w_upper_rule)
 
-        # C15: Pickup before dropoff ordering
+        # C15: Pickup before dropoff ordering (skip for stays-with-vehicle resources)
         def pickup_order_rule(model: pyo.ConcreteModel, v: str, r: str) -> pyo.Expression | type:
+            if r in swv_resource_ids:
+                return pyo.Constraint.Skip
             p = pyo.value(model.resource_pickup[r])
             d = pyo.value(model.resource_dropoff[r])
             if p == d:
@@ -426,17 +449,89 @@ def build_base_model(request: SolveRequest, profile: ClientProfile) -> pyo.Concr
 
         model.pickup_before_dropoff = pyo.Constraint(model.V, model.R, rule=pickup_order_rule)
 
-        # C16: Resource requirement satisfaction
-        if requirement_satisfiers:
+        # serves_qty variable — quantity of a swv resource available at a location via its vehicle
+        serves_set: set[tuple[str, str, str]] = set()
+        for (loc_id, req_idx), resource_ids in swv_satisfiers.items():
+            for r_id in resource_ids:
+                for v in request.vehicles:
+                    serves_set.add((v.id, r_id, loc_id))
+
+        if serves_set:
+            model.SERVES_SET = pyo.Set(initialize=list(serves_set), dimen=3)
+
+            def serves_qty_bounds(model: pyo.ConcreteModel, v: str, r: str, i: str) -> tuple[float, float]:
+                return (0, resource_by_id[r].quantity)
+
+            model.serves_qty = pyo.Var(
+                model.SERVES_SET, within=pyo.NonNegativeReals, bounds=serves_qty_bounds
+            )
+
+            # C17a: serves_qty <= y (can only serve if vehicle carries the resource)
+            def serves_upper_y_rule(model: pyo.ConcreteModel, v: str, r: str, i: str) -> pyo.Expression:
+                return model.serves_qty[v, r, i] <= model.y[v, r]
+
+            model.serves_upper_y = pyo.Constraint(model.SERVES_SET, rule=serves_upper_y_rule)
+
+            # C17b: serves_qty <= quantity * (visits to location)
+            def serves_upper_visit_rule(
+                model: pyo.ConcreteModel, v: str, r: str, i: str
+            ) -> pyo.Expression:
+                qty = pyo.value(model.resource_quantity[r])
+                v_start = pyo.value(model.vehicle_start[v])
+                v_end = pyo.value(model.vehicle_end[v])
+                if i == v_start or i == v_end:
+                    return model.serves_qty[v, r, i] <= qty * model.vehicle_used[v]
+                else:
+                    visits = sum(model.x[v, j, i] for j in model.N if (j, i) in arc_set)
+                    return model.serves_qty[v, r, i] <= qty * visits
+
+            model.serves_upper_visit = pyo.Constraint(model.SERVES_SET, rule=serves_upper_visit_rule)
+
+            # C17c: serves_qty >= y - quantity * (1 - visits) — force non-zero when vehicle visits
+            def serves_lower_rule(
+                model: pyo.ConcreteModel, v: str, r: str, i: str
+            ) -> pyo.Expression:
+                qty = pyo.value(model.resource_quantity[r])
+                v_start = pyo.value(model.vehicle_start[v])
+                v_end = pyo.value(model.vehicle_end[v])
+                if i == v_start or i == v_end:
+                    visits_expr = model.vehicle_used[v]
+                else:
+                    visits_expr = sum(model.x[v, j, i] for j in model.N if (j, i) in arc_set)
+                return model.serves_qty[v, r, i] >= model.y[v, r] - qty * (1 - visits_expr)
+
+            model.serves_lower = pyo.Constraint(model.SERVES_SET, rule=serves_lower_rule)
+
+        # C16: Resource requirement satisfaction — handles both consumed and swv
+        all_req_keys = set(consumed_satisfiers.keys()) | set(swv_satisfiers.keys())
+
+        if all_req_keys:
             def req_satisfy_rule(
                 model: pyo.ConcreteModel, loc_id: str, req_idx: int
             ) -> pyo.Expression:
-                satisfier_ids = requirement_satisfiers[(loc_id, req_idx)]
                 req_qty = location_by_id[loc_id].required_resources[req_idx].quantity
-                return sum(model.y[v, r] for v in model.V for r in satisfier_ids) >= req_qty
 
-            req_keys = list(requirement_satisfiers.keys())
-            model.REQ_KEYS = pyo.Set(initialize=req_keys, dimen=2)
+                # Consumed contribution: sum of delivered quantities
+                consumed_ids = consumed_satisfiers.get((loc_id, req_idx), [])
+                consumed_contrib = (
+                    sum(model.y[v, r] for v in model.V for r in consumed_ids)
+                    if consumed_ids else 0
+                )
+
+                # SWV contribution: sum of serves_qty (quantity available at location via visiting vehicle)
+                swv_ids = swv_satisfiers.get((loc_id, req_idx), [])
+                swv_contrib = (
+                    sum(
+                        model.serves_qty[v, r, loc_id]
+                        for v in model.V for r in swv_ids
+                        if (v, r, loc_id) in serves_set
+                    )
+                    if swv_ids else 0
+                )
+
+                return consumed_contrib + swv_contrib >= req_qty
+
+            model.REQ_KEYS = pyo.Set(initialize=list(all_req_keys), dimen=2)
             model.requirement_satisfaction = pyo.Constraint(
                 model.REQ_KEYS,
                 rule=lambda model, loc_id, req_idx: req_satisfy_rule(model, loc_id, req_idx),
@@ -464,6 +559,13 @@ def build_base_model(request: SolveRequest, profile: ClientProfile) -> pyo.Concr
     model._profile = profile
     model._depots = depots
     model._visit_locations = visit_locations
-    model._requirement_satisfiers = requirement_satisfiers
+    model._consumed_satisfiers = consumed_satisfiers
+    model._swv_satisfiers = swv_satisfiers
+    # Union for backward compatibility — merge lists for keys in both dicts
+    all_req_keys = set(consumed_satisfiers.keys()) | set(swv_satisfiers.keys())
+    model._requirement_satisfiers = {
+        k: consumed_satisfiers.get(k, []) + swv_satisfiers.get(k, [])
+        for k in all_req_keys
+    }
 
     return model

@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ResourceRequirement(BaseModel):
@@ -49,21 +49,43 @@ class Resource(BaseModel):
     People and goods are both resources. A landscaper is a resource with skills.
     A bag of mulch is a resource with weight. The solver doesn't distinguish between them.
 
+    Resources are either:
+    - stays_with_vehicle=True: ride with the vehicle all day (workers, mowers). dropoff_location_id
+      may be omitted entirely — they return to depot when the vehicle does.
+    - stays_with_vehicle=False (default): consumed — picked up and dropped off at specific locations
+      (mulch, passengers). dropoff_location_id is required.
+
     Examples:
-        Landscaper: Resource(id="worker_1", pickup_location_id="depot", dropoff_location_id="site_a",
-                             compartment_types=["cab"], capacity_consumption={"seats": 1},
-                             attributes={"skill": "mower_operator"})
-        Mower: Resource(id="mower_1", pickup_location_id="depot", dropoff_location_id="site_a",
-                        compartment_types=["bed", "trunk"], capacity_consumption={"weight": 150, "volume": 10},
-                        attributes={"type": "mower"})
+        Worker (stays with vehicle):
+            Resource(id="worker_1", pickup_location_id="depot",
+                     compartment_types=["cab"], capacity_consumption={"seats": 1},
+                     attributes={"skill": "mower_operator"}, stays_with_vehicle=True)
+        Mulch (consumed):
+            Resource(id="mulch_1", pickup_location_id="depot", dropoff_location_id="site_a",
+                     compartment_types=["bed"], capacity_consumption={"weight": 50, "volume": 3},
+                     quantity=10)
+        Robotaxi passenger (consumed):
+            Resource(id="passenger_1", pickup_location_id="stop_a", dropoff_location_id="stop_b",
+                     compartment_types=["cabin"], capacity_consumption={"seats": 1})
     """
     id: str
     pickup_location_id: str
-    dropoff_location_id: str
+    dropoff_location_id: str | None = None
     compartment_types: list[str] = Field(..., min_length=1)
     capacity_consumption: dict[str, float]
     quantity: int = 1
     attributes: dict[str, str | list[str] | bool | int | float] = {}
+    stays_with_vehicle: bool = False
+
+    @model_validator(mode="after")
+    def dropoff_required_for_consumed(self) -> "Resource":
+        if not self.stays_with_vehicle and self.dropoff_location_id is None:
+            raise ValueError(
+                f"Resource '{self.id}': dropoff_location_id is required when stays_with_vehicle=False. "
+                "Set stays_with_vehicle=True for resources that ride with the vehicle all day (workers, equipment), "
+                "or provide a dropoff_location_id for consumed resources (mulch, passengers)."
+            )
+        return self
 
 
 class SolveRequest(BaseModel):

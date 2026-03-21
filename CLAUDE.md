@@ -19,7 +19,7 @@ Four concepts are foundational and handled by the base model:
 - **Locations**: Places on the map (depots, job sites, warehouses, charging stations)
 - **Vehicles**: Move between locations, contain one or more compartments
 - **Compartments**: Spaces within vehicles with capacity dimensions (weight, volume, seats, etc.)
-- **Resources**: Things being moved — people AND goods. Each has a pickup location, dropoff location, compatible compartment types (list), capacity consumption, quantity, and optional attributes (skills, certifications, etc.)
+- **Resources**: Things being moved — people AND goods. Each has a pickup location, dropoff location (for consumed resources), compatible compartment types (list), capacity consumption, quantity, and optional attributes (skills, certifications, etc.). Resources can be `stays_with_vehicle=True` (ride with the vehicle all day, like workers and equipment) or consumed (picked up and dropped off, like mulch).
 
 People and goods are both resources. A person with a skill is a resource with an attribute. A job site requiring a forklift operator is a location requiring a resource with `skills: [forklift]`. The solver doesn't distinguish people from goods.
 

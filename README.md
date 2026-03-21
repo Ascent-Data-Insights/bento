@@ -26,15 +26,17 @@ Things that move between locations. Each vehicle has one or more compartments.
 Spaces within a vehicle, each with capacity dimensions. A pickup truck has a cab (seats=3) and a bed (weight=1000lbs, volume=50cuft). A robotaxi has a cabin (seats=4). A refrigerated truck has a cold section and an ambient section. Compartments are how the model understands what a vehicle can carry.
 
 ### Resources
-Things being moved. A resource is anything that gets picked up at one location and dropped off at another, consuming compartment capacity. People and goods are both resources:
+Things being moved. A resource is anything that gets picked up at one location and either dropped off at a specific location or rides along for the whole route, consuming compartment capacity. People and goods are both resources:
 
-| Resource | Compartment Type | Consumes | Attributes |
-|---|---|---|---|
-| Landscaper (mower operator) | Cab | 1 seat | `skills: [mower_operator]` |
-| Lawn mower | Bed or Trailer | weight, volume | `type: mower` |
-| 10 bags of mulch | Bed | weight, volume (quantity=10) | — |
-| Robotaxi passenger | Cabin | 1 seat | — |
-| Pallet of frozen pizzas | Refrigerated | weight, volume | — |
+| Resource | Compartment Type | Consumes | Attributes | Stays with vehicle? |
+|---|---|---|---|---|
+| Landscaper (mower operator) | Cab | 1 seat | `skills: [mower_operator]` | Yes |
+| Lawn mower | Bed or Trailer | weight, volume | `type: mower` | Yes |
+| 10 bags of mulch | Bed | weight, volume (quantity=10) | — | No (consumed) |
+| Robotaxi passenger | Cabin | 1 seat | — | No (consumed) |
+| Pallet of frozen pizzas | Refrigerated | weight, volume | — | No (consumed) |
+
+Resources are either **stays-with-vehicle** (`stays_with_vehicle=True`) or **consumed** (the default). A stays-with-vehicle resource — like a worker or a mower — rides along for the entire route and is present at every location the vehicle visits. A consumed resource — like mulch or a passenger — has a specific dropoff location and is removed from the vehicle at that stop.
 
 The solver doesn't distinguish between people and goods — they're all resources with attributes, pickup/dropoff locations, and capacity consumption. A job site that needs a forklift-certified worker just requires a resource with `skills: [forklift]`. Resources can list multiple compatible compartment types (e.g., a mower fits in a bed or a trailer) and can have a quantity for batch items (e.g., 10 bags of mulch).
 
@@ -46,6 +48,7 @@ The solver doesn't distinguish between people and goods — they're all resource
 - Enforce compartment capacity limits at every point in the route
 - Satisfy location resource requirements (skills, equipment, quantities)
 - Allow multiple vehicles to serve the same location when needed
+- Support for stays-with-vehicle resources (workers, equipment) that ride along for the entire route
 - Subtour elimination (MTZ formulation)
 
 ### Known Limitations

@@ -98,6 +98,49 @@ class TestResource:
                 capacity_consumption={"seats": 1},
             )
 
+    def test_stays_with_vehicle_default(self):
+        r = Resource(
+            id="worker_1",
+            pickup_location_id="depot",
+            dropoff_location_id="site_a",
+            compartment_types=["cab"],
+            capacity_consumption={"seats": 1},
+        )
+        assert r.stays_with_vehicle is False
+
+    def test_stays_with_vehicle_no_dropoff(self):
+        r = Resource(
+            id="worker_1",
+            pickup_location_id="depot",
+            compartment_types=["cab"],
+            capacity_consumption={"seats": 1},
+            stays_with_vehicle=True,
+        )
+        assert r.stays_with_vehicle is True
+        assert r.dropoff_location_id is None
+
+    def test_consumed_requires_dropoff(self):
+        with pytest.raises(ValidationError):
+            Resource(
+                id="bad",
+                pickup_location_id="depot",
+                compartment_types=["cab"],
+                capacity_consumption={"seats": 1},
+                stays_with_vehicle=False,
+            )
+
+    def test_stays_with_vehicle_with_dropoff_allowed(self):
+        r = Resource(
+            id="worker_1",
+            pickup_location_id="depot",
+            dropoff_location_id="site_a",
+            compartment_types=["cab"],
+            capacity_consumption={"seats": 1},
+            stays_with_vehicle=True,
+        )
+        assert r.stays_with_vehicle is True
+        assert r.dropoff_location_id == "site_a"
+
     def test_quantity_default(self):
         r = Resource(
             id="worker_1",

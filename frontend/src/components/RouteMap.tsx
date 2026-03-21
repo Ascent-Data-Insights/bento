@@ -6,29 +6,33 @@ import { getRouteColor } from '../utils/route-colors'
 import { locationLabels, locationDescriptions, formatAttributeValue } from '../data/grasscutting-demo'
 import { fetchRouteGeometry } from '../api/matrices'
 
-// Custom marker icons using divIcon (no image asset issues)
-function createMarkerIcon(color: string, size: number = 12, pulse: boolean = false) {
+// Circle marker with a Lucide icon inside
+function createPinIcon(color: string, iconPath: string, size: number = 32) {
+  const half = size / 2
+  const iconSize = size * 0.55
+  const iconOffset = (size - iconSize) / 2
   return L.divIcon({
     className: '',
     iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
+    iconAnchor: [half, half],
+    popupAnchor: [0, -half],
     html: `
-      <div style="
-        width: ${size}px;
-        height: ${size}px;
-        background: ${color};
-        border: 2.5px solid white;
-        border-radius: 50%;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-        ${pulse ? 'animation: pulse 2s infinite;' : ''}
-      "></div>
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="${half}" cy="${half}" r="${half}" fill="${color}" stroke="white" stroke-width="2.5"/>
+        <svg x="${iconOffset}" y="${iconOffset}" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          ${iconPath}
+        </svg>
+      </svg>
     `,
   })
 }
 
-const depotIcon = createMarkerIcon('#03344E', 16)
-const jobIcon = createMarkerIcon('#4785BF', 12)
-const jobActiveIcon = createMarkerIcon('#FB8500', 14)
+// Lucide icon paths
+const WAREHOUSE_PATH = '<path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/><rect x="9" y="18" width="6" height="4"/>'
+const HOUSE_PATH = '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
+
+const depotIcon = createPinIcon('#03344E', WAREHOUSE_PATH, 40)
+const jobIcon = createPinIcon('#4785BF', HOUSE_PATH, 34)
 
 // Component to fit bounds on mount / location changes
 function FitBounds({ locations }: { locations: Location[] }) {
@@ -181,14 +185,6 @@ export function RouteMap({
     }
   })
 
-  // Locations that are on the selected route
-  const selectedStops = new Set<string>()
-  if (selectedRoute && routes) {
-    const route = routes.find((r) => r.vehicle_id === selectedRoute)
-    if (route) {
-      route.stops.forEach((s) => selectedStops.add(s.location_id))
-    }
-  }
 
   return (
     <MapContainer
@@ -240,12 +236,7 @@ export function RouteMap({
       {/* Location markers */}
       {locations.map((loc) => {
         const isDepot = depotIds.has(loc.id)
-        const isOnSelectedRoute = selectedStops.has(loc.id)
-        const icon = isDepot
-          ? depotIcon
-          : isOnSelectedRoute
-            ? jobActiveIcon
-            : jobIcon
+        const icon = isDepot ? depotIcon : jobIcon
 
         return (
           <Marker

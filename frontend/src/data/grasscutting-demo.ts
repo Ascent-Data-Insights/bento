@@ -49,8 +49,8 @@ export const demoLocations: Location[] = [
   },
   {
     id: 'crestview_estates',
-    latitude: 39.2320,
-    longitude: -84.3780,
+    latitude: 39.0540,
+    longitude: -84.6600,
     service_time: 75,
     required_resources: [
       { attributes: { skill: 'mower_operator' }, quantity: 1 },
@@ -183,12 +183,12 @@ const locIds = demoLocations.map((l) => l.id)
 
 // Hand-crafted distance matrix (km) — roughly realistic for Cincinnati
 const distValues: Record<string, Record<string, number>> = {
-  depot:               { depot: 0, johnson_residence: 9,  oak_hills_community: 12, riverside_park: 16, summit_ave: 3,  crestview_estates: 18 },
-  johnson_residence:   { depot: 9, johnson_residence: 0,  oak_hills_community: 18, riverside_park: 8,  summit_ave: 7,  crestview_estates: 12 },
-  oak_hills_community: { depot: 12, johnson_residence: 18, oak_hills_community: 0, riverside_park: 24, summit_ave: 10, crestview_estates: 26 },
-  riverside_park:      { depot: 16, johnson_residence: 8,  oak_hills_community: 24, riverside_park: 0,  summit_ave: 14, crestview_estates: 17 },
-  summit_ave:          { depot: 3,  johnson_residence: 7,  oak_hills_community: 10, riverside_park: 14, summit_ave: 0,  crestview_estates: 16 },
-  crestview_estates:   { depot: 18, johnson_residence: 12, oak_hills_community: 26, riverside_park: 17, summit_ave: 16, crestview_estates: 0 },
+  depot:               { depot: 0, johnson_residence: 10, oak_hills_community: 16, riverside_park: 15, summit_ave: 15, crestview_estates: 25 },
+  johnson_residence:   { depot: 10, johnson_residence: 0, oak_hills_community: 10, riverside_park: 7,  summit_ave: 5,  crestview_estates: 20 },
+  oak_hills_community: { depot: 16, johnson_residence: 10, oak_hills_community: 0, riverside_park: 20, summit_ave: 10, crestview_estates: 12 },
+  riverside_park:      { depot: 15, johnson_residence: 7,  oak_hills_community: 20, riverside_park: 0,  summit_ave: 12, crestview_estates: 25 },
+  summit_ave:          { depot: 15, johnson_residence: 5,  oak_hills_community: 10, riverside_park: 12, summit_ave: 0,  crestview_estates: 15 },
+  crestview_estates:   { depot: 25, johnson_residence: 20, oak_hills_community: 12, riverside_park: 25, summit_ave: 15, crestview_estates: 0 },
 }
 
 // Time matrix (minutes) — roughly distance * 2 for city driving
@@ -205,14 +205,15 @@ export const demoMatrices = {
   time: timeValues,
 }
 
-// Time windows (minutes from midnight): generous 4-6 hour windows
+// Time windows (minutes from midnight): tight windows force multiple trucks
 const demoTimeWindows = {
   windows: [
-    { location_id: 'johnson_residence', earliest: 480, latest: 720 },     // 8am - 12pm
-    { location_id: 'oak_hills_community', earliest: 480, latest: 900 },   // 8am - 3pm
-    { location_id: 'riverside_park', earliest: 540, latest: 780 },        // 9am - 1pm
-    { location_id: 'summit_ave', earliest: 480, latest: 840 },            // 8am - 2pm
-    { location_id: 'crestview_estates', earliest: 600, latest: 960 },     // 10am - 4pm
+    { location_id: 'depot', earliest: 420, latest: 1020 },                // 7am - 5pm (operating hours)
+    { location_id: 'johnson_residence', earliest: 480, latest: 600 },     // 8am - 10am (east side, morning only)
+    { location_id: 'oak_hills_community', earliest: 480, latest: 600 },   // 8am - 10am (west side, same window — forces 2nd truck)
+    { location_id: 'riverside_park', earliest: 600, latest: 720 },        // 10am - 12pm
+    { location_id: 'summit_ave', earliest: 540, latest: 660 },            // 9am - 11am
+    { location_id: 'crestview_estates', earliest: 600, latest: 840 },     // 10am - 2pm (southwest, needs travel time)
   ],
 }
 

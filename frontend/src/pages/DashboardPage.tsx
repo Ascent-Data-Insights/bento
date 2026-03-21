@@ -59,6 +59,7 @@ export function DashboardPage() {
     setError(null)
     setSolveResult(null)
     setSelectedRoute(null)
+    setFocusLocation(null)
 
     try {
       // Build the request with real OSRM matrices

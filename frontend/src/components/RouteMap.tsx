@@ -59,8 +59,24 @@ function FitToRoute({
 }) {
   const map = useMap()
   const prevSelected = useRef<string | null>(null)
+  const prevRouteCount = useRef(0)
 
   useEffect(() => {
+    const routeCount = routeLines.length
+
+    // Routes just appeared (optimize was clicked) — zoom to fit all
+    if (routeCount > 0 && prevRouteCount.current === 0) {
+      prevRouteCount.current = routeCount
+      prevSelected.current = null
+      const allCoords = routeLines.flatMap((r) => r.coords)
+      if (allCoords.length > 0) {
+        map.flyToBounds(L.latLngBounds(allCoords), { padding: [50, 50], duration: 0.6 })
+      }
+      return
+    }
+    prevRouteCount.current = routeCount
+
+    // Selection changed
     if (selectedRoute === prevSelected.current) return
     prevSelected.current = selectedRoute
 
@@ -179,7 +195,7 @@ export function RouteMap({
       center={[39.14, -84.50]}
       zoom={11}
       className="h-full w-full"
-      zoomControl={false}
+      zoomControl={true}
     >
       <TileLayer
         attribution='&copy; <a href="https://carto.com/">CARTO</a>'

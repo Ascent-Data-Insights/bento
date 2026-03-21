@@ -250,6 +250,15 @@ export const locationLabels: Record<string, string> = {
   crestview_estates: 'Crestview Estates',
 }
 
+export const locationDescriptions: Record<string, string> = {
+  depot: 'Warehouse & dispatch center',
+  johnson_residence: 'Weekly mow & edge, front and back yard',
+  oak_hills_community: 'Full grounds maintenance, mulch beds and common areas',
+  riverside_park: 'Bi-weekly mow, trim along walking paths',
+  summit_ave: 'Quote for new landscaping design',
+  crestview_estates: 'Spring cleanup, mowing, and mulch delivery',
+}
+
 export const resourceLabels: Record<string, string> = {
   mike: 'Mike',
   dave: 'Dave',
@@ -267,6 +276,25 @@ export const vehicleLabels: Record<string, string> = {
   truck_alpha: 'Truck Alpha',
   truck_bravo: 'Truck Bravo',
   truck_charlie: 'Truck Charlie',
+}
+
+export const attributeLabels: Record<string, string> = {
+  mower_operator: 'Mower Operator',
+  mower: 'Mower',
+  hedger: 'Hedger',
+  mulch: 'Mulch',
+}
+
+export const compartmentLabels: Record<string, string> = {
+  cab: 'Cab',
+  bed: 'Truck Bed',
+  trailer: 'Trailer',
+}
+
+export function formatAttributeValue(value: string | string[] | boolean | number): string {
+  if (typeof value === 'string') return attributeLabels[value] || value
+  if (Array.isArray(value)) return value.map((v) => attributeLabels[v] || v).join(', ')
+  return String(value)
 }
 
 export function formatTime(minutes: number): string {

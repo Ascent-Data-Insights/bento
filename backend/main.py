@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes.solve import router as solve_router
+from backend.api.routes.matrices import router as matrices_router
 
 app = FastAPI(
     title="Routing Product API",
@@ -20,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(solve_router)
+app.include_router(matrices_router)
 
 
 @app.get("/health")

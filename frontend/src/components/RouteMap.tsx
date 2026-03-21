@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet'
 import type { Location, Route } from '../types/api'
 import { getRouteColor } from '../utils/route-colors'
-import { locationLabels } from '../data/grasscutting-demo'
+import { locationLabels, locationDescriptions, formatAttributeValue } from '../data/grasscutting-demo'
 
 // Custom marker icons using divIcon (no image asset issues)
 function createMarkerIcon(color: string, size: number = 12, pulse: boolean = false) {
@@ -176,6 +176,9 @@ export function RouteMap({
                 {isDepot && (
                   <div className="text-xs text-gray-500 mt-0.5">Depot</div>
                 )}
+                {locationDescriptions[loc.id] && (
+                  <div className="text-xs text-gray-500 mt-0.5">{locationDescriptions[loc.id]}</div>
+                )}
                 {loc.service_time ? (
                   <div className="text-xs text-gray-600 mt-1">
                     Service: {loc.service_time} min
@@ -184,8 +187,8 @@ export function RouteMap({
                 {loc.required_resources && loc.required_resources.length > 0 && (
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {loc.required_resources.map((req, i) => {
-                      const label = Object.entries(req.attributes)
-                        .map(([, v]) => v)
+                      const label = Object.values(req.attributes)
+                        .map((v) => formatAttributeValue(v))
                         .join(', ')
                       return (
                         <span

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { SolveResponse } from '../types/api'
 import { solveRoutes } from '../api/client'
+import { computeMatrices } from '../api/matrices'
 import {
   demoLocations,
   demoVehicles,
@@ -19,9 +20,31 @@ const depotIds = new Set(
 export function DashboardPage() {
   const [solveResult, setSolveResult] = useState<SolveResponse | null>(null)
   const [loading, setLoading] = useState(false)
+  const [matricesLoading, setMatricesLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null)
   const [focusLocation, setFocusLocation] = useState<string | null>(null)
+  const [matrices, setMatrices] = useState<Record<string, Record<string, Record<string, number>>> | null>(null)
+
+  // Compute real matrices from OSRM on mount
+  useEffect(() => {
+    let cancelled = false
+    computeMatrices(demoLocations)
+      .then((result) => {
+        if (!cancelled) {
+          setMatrices(result)
+          setMatricesLoading(false)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.warn('OSRM failed, falling back to demo matrices:', err)
+          setMatrices(demoSolveRequestBody.request.matrices)
+          setMatricesLoading(false)
+        }
+      })
+    return () => { cancelled = true }
+  }, [])
 
   const handleReset = () => {
     setSolveResult(null)
@@ -31,13 +54,22 @@ export function DashboardPage() {
   }
 
   const handleOptimize = async () => {
+    if (!matrices) return
     setLoading(true)
     setError(null)
     setSolveResult(null)
     setSelectedRoute(null)
 
     try {
-      const result = await solveRoutes(demoSolveRequestBody)
+      // Build the request with real OSRM matrices
+      const requestBody = {
+        ...demoSolveRequestBody,
+        request: {
+          ...demoSolveRequestBody.request,
+          matrices,
+        },
+      }
+      const result = await solveRoutes(requestBody)
       setSolveResult(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Optimization failed')
@@ -59,8 +91,21 @@ export function DashboardPage() {
           focusLocationId={focusLocation}
         />
 
+        {/* Matrix loading indicator */}
+        {matricesLoading && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[450]">
+            <div className="rounded-full bg-white/90 backdrop-blur-sm shadow-lg px-4 py-2 flex items-center gap-2 text-sm text-gray-600">
+              <svg className="animate-spin h-4 w-4 text-brand-secondary" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Computing driving distances…
+            </div>
+          </div>
+        )}
+
         {/* Floating optimize bar — bottom center over the map */}
-        {!solveResult && (
+        {!solveResult && !matricesLoading && (
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[450]">
             <button
               onClick={handleOptimize}

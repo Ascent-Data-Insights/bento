@@ -4,9 +4,12 @@ import { SolveStatus } from '../types/api'
 import { getRouteColor } from '../utils/route-colors'
 import {
   locationLabels,
+  locationDescriptions,
   resourceLabels,
   vehicleLabels,
+  compartmentLabels,
   formatTime,
+  formatAttributeValue,
 } from '../data/grasscutting-demo'
 
 interface DetailPanelProps {
@@ -22,17 +25,17 @@ interface DetailPanelProps {
 }
 
 function StatusBadge({ status }: { status: SolveStatus }) {
-  const colorMap: Record<string, 'green' | 'amber' | 'red' | 'zinc'> = {
-    [SolveStatus.OPTIMAL]: 'green',
-    [SolveStatus.FEASIBLE]: 'amber',
-    [SolveStatus.INFEASIBLE]: 'red',
-    [SolveStatus.TIMEOUT]: 'red',
-    [SolveStatus.ERROR]: 'red',
+  const styles: Record<string, string> = {
+    [SolveStatus.OPTIMAL]: 'bg-green-500 text-white',
+    [SolveStatus.FEASIBLE]: 'bg-amber-500 text-white',
+    [SolveStatus.INFEASIBLE]: 'bg-red-500 text-white',
+    [SolveStatus.TIMEOUT]: 'bg-red-500 text-white',
+    [SolveStatus.ERROR]: 'bg-red-500 text-white',
   }
   return (
-    <Badge color={colorMap[status] || 'zinc'}>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ${styles[status] || 'bg-zinc-500 text-white'}`}>
       {status.toUpperCase()}
-    </Badge>
+    </span>
   )
 }
 
@@ -100,6 +103,9 @@ function PreSolveView({
                     {loc.service_time} min
                   </span>
                 </div>
+                {locationDescriptions[loc.id] && (
+                  <p className="text-xs text-gray-500 mt-0.5">{locationDescriptions[loc.id]}</p>
+                )}
                 {tw && (
                   <div className="mt-1 text-[11px] text-gray-500">
                     {formatTime(tw.earliest)} – {formatTime(tw.latest)}
@@ -107,7 +113,7 @@ function PreSolveView({
                 )}
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {(loc.required_resources || []).map((req, i) => {
-                    const label = Object.values(req.attributes).join(', ')
+                    const label = Object.values(req.attributes).map((v) => formatAttributeValue(v)).join(', ')
                     const isSkill = 'skill' in req.attributes
                     return (
                       <Badge key={i} color={isSkill ? 'sky' : 'emerald'}>
@@ -133,7 +139,7 @@ function PreSolveView({
               </span>
               <div className="flex gap-1">
                 {v.compartments.map((c, i) => (
-                  <Badge key={i} color="zinc">{c.type}</Badge>
+                  <Badge key={i} color="zinc">{compartmentLabels[c.type] || c.type}</Badge>
                 ))}
               </div>
             </div>

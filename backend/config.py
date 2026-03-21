@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     solver_time_limit: int = 300
     custom_modules_dir: Path = _BACKEND_DIR / "solver" / "custom"
     log_level: str = "INFO"
+    osrm_base_url: str = "https://router.project-osrm.org"
 
     model_config = {"env_prefix": "ROUTING_"}
 

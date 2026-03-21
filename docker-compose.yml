@@ -1,0 +1,9 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ROUTING_SOLVER_NAME=cbc
+      - ROUTING_SOLVER_TIME_LIMIT=300
+      - ROUTING_LOG_LEVEL=INFO

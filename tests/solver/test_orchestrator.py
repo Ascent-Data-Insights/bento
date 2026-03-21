@@ -144,7 +144,7 @@ class TestOrchestratorValidation:
             modules=[ModuleConfig(key="nonexistent_module")],
         )
         orchestrator = Orchestrator()
-        with pytest.raises(SolverError, match="not found in registry"):
+        with pytest.raises(ValidationError):
             orchestrator.solve(grasscutting_request, profile)
 
     def test_module_dependency_error(self, grasscutting_request):

@@ -68,7 +68,7 @@ Structural choices that shape the problem. Each client selects one option per di
 
 The **objective** is not a dimension — it's a weighted dict on the client profile. Keys reference named cost matrices (e.g., `"distance"`, `"time"`, `"fuel"`) or the special term `"vehicles"`. Examples: `{"distance": 1.0}` to minimize distance, `{"distance": 0.7, "time": 0.3}` for a multi-objective blend, `{"vehicles": 100, "distance": 1.0}` to minimize fleet size with distance as tiebreaker.
 
-Cost matrices are provided per solve request. Clients can supply any named matrices (distance, time, fuel cost, etc.). If none are provided, a distance matrix is computed from location lat/long coordinates via haversine.
+Cost matrices are provided per solve request. Clients can supply any named matrices (distance, time, fuel cost, etc.). Matrices must be provided in every solve request — there is no auto-computation fallback.
 
 ## Constraint Modules
 
@@ -123,6 +123,66 @@ Three demos proving the model's flexibility across radically different industrie
 ## System Dependencies
 
 - **CBC solver**: Required for optimization. Install via `sudo apt install coinor-cbc` (Ubuntu/Debian). Not a Python package — it's a system binary that Pyomo calls. For production, include in a Dockerfile.
+
+## Running
+
+### Local Development
+
+```bash
+uv run uvicorn backend.main:app --reload
+```
+
+### Docker
+
+```bash
+docker compose up --build
+```
+
+### Endpoints
+
+- **Health check**: `GET http://localhost:8000/health`
+- **Solve**: `POST http://localhost:8000/api/v1/solve`
+
+### Example Solve Request
+
+```bash
+curl -X POST http://localhost:8000/api/v1/solve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request": {
+      "locations": [
+        {"id": "depot", "latitude": 40.7128, "longitude": -74.006},
+        {"id": "site_a", "latitude": 40.7228, "longitude": -74.000, "service_time": 60,
+         "required_resources": [{"attributes": {"skill": "mower_operator"}, "quantity": 1}]}
+      ],
+      "vehicles": [
+        {"id": "truck_1", "start_location_id": "depot", "end_location_id": "depot",
+         "compartments": [{"type": "cab", "capacity": {"seats": 2}}]}
+      ],
+      "resources": [
+        {"id": "worker_1", "pickup_location_id": "depot",
+         "compartment_types": ["cab"], "capacity_consumption": {"seats": 1},
+         "attributes": {"skill": "mower_operator"}, "stays_with_vehicle": true}
+      ],
+      "matrices": {
+        "distance": {
+          "depot": {"depot": 0, "site_a": 5},
+          "site_a": {"depot": 5, "site_a": 0}
+        }
+      }
+    },
+    "profile": {
+      "tenant_id": "demo",
+      "name": "Demo Landscaper",
+      "dimensions": {
+        "origin_model": "single_depot",
+        "fleet_composition": "heterogeneous"
+      },
+      "objective": {"distance": 1.0},
+      "modules": []
+    }
+  }'
+```
 
 ## Project Structure
 

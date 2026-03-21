@@ -82,7 +82,7 @@ class Orchestrator:
             if not config.enabled:
                 continue
             if config.key not in REGISTRY:
-                raise SolverError(f"Module '{config.key}' not found in registry.")
+                raise ValidationError([f"Module '{config.key}' not found in registry."])
             resolved.append((REGISTRY[config.key], config))
         return resolved
 

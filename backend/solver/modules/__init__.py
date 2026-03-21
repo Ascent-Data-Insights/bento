@@ -8,3 +8,8 @@ def register(cls: type[ConstraintModule]) -> type[ConstraintModule]:
     instance = cls()
     REGISTRY[instance.get_metadata().key] = instance
     return cls
+
+
+# Import modules to trigger @register
+from backend.solver.modules import time_windows  # noqa: F401
+from backend.solver.modules import co_delivery  # noqa: F401

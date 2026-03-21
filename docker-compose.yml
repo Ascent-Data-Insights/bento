@@ -7,3 +7,10 @@ services:
       - ROUTING_SOLVER_NAME=cbc
       - ROUTING_SOLVER_TIME_LIMIT=300
       - ROUTING_LOG_LEVEL=INFO
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules

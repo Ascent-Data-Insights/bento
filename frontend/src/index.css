@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Kodchasan:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #03344E;
+  --color-brand-secondary: #4785BF;
+  --color-brand-accent: #FB8500;
+  --font-heading: 'Kodchasan', sans-serif;
+  --font-body: 'Manrope', sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+}

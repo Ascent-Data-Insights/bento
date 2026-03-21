@@ -73,7 +73,8 @@ export function SidebarLayout({
   navbar,
   sidebar,
   children,
-}: React.PropsWithChildren<{ navbar: React.ReactNode; sidebar: React.ReactNode }>) {
+  fullBleed = false,
+}: React.PropsWithChildren<{ navbar: React.ReactNode; sidebar: React.ReactNode; fullBleed?: boolean }>) {
   let [showSidebar, setShowSidebar] = useState(false)
   let [collapsed, setCollapsed] = useState(false)
 
@@ -82,12 +83,12 @@ export function SidebarLayout({
       <div className="relative isolate flex min-h-svh w-full bg-white max-lg:flex-col lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950">
         {/* Sidebar on desktop */}
         <div
-          className={`fixed inset-y-0 left-0 max-lg:hidden transition-all duration-200 ${collapsed ? 'w-16' : 'w-64'}`}
+          className={`fixed inset-y-0 left-0 max-lg:hidden transition-all duration-200 z-[1001] ${collapsed ? 'w-16' : 'w-64'}`}
         >
           {sidebar}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="absolute -right-3 top-8 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-zinc-950/10 hover:bg-zinc-50 transition"
+            className="absolute -right-3 bottom-8 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-zinc-950/10 hover:bg-zinc-50 transition z-20"
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <ExpandIcon /> : <CollapseIcon />}
@@ -110,10 +111,14 @@ export function SidebarLayout({
         </header>
 
         {/* Content */}
-        <main className={`flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 transition-all duration-200 ${collapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
-          <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
-            <div className="mx-auto max-w-6xl">{children}</div>
-          </div>
+        <main className={`flex flex-1 flex-col lg:min-w-0 transition-all duration-200 ${collapsed ? 'lg:pl-16' : 'lg:pl-64'} ${fullBleed ? '' : 'pb-2 lg:pt-2 lg:pr-2'}`}>
+          {fullBleed ? (
+            <div className="relative flex-1 h-full min-h-0">{children}</div>
+          ) : (
+            <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
+              <div className="mx-auto max-w-6xl">{children}</div>
+            </div>
+          )}
         </main>
       </div>
     </SidebarCollapseContext.Provider>

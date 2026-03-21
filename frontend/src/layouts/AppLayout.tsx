@@ -109,6 +109,10 @@ function AppSidebar() {
 }
 
 export function AppLayout() {
+  const location = useLocation()
+  const fullBleedPaths = ['/']
+  const isFullBleed = fullBleedPaths.includes(location.pathname)
+
   return (
     <SidebarLayout
       navbar={
@@ -117,6 +121,7 @@ export function AppLayout() {
         </Navbar>
       }
       sidebar={<AppSidebar />}
+      fullBleed={isFullBleed}
     >
       <Outlet />
     </SidebarLayout>

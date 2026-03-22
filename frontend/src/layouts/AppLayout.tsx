@@ -1,5 +1,6 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useTenant } from '../contexts/TenantContext'
 import { branding } from '../config/branding'
 import { SidebarLayout, useSidebarCollapse } from '../components/sidebar-layout'
 import {
@@ -55,6 +56,7 @@ function AppSidebar() {
   const navigate = useNavigate()
   const { logout } = useAuth()
   const { collapsed } = useSidebarCollapse()
+  const { tenants, activeTenant, setActiveTenant } = useTenant()
 
   const handleLogout = () => {
     logout()
@@ -63,20 +65,42 @@ function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader>
-        {collapsed ? (
+      {collapsed ? (
+        <SidebarHeader>
           <div className="flex justify-center px-2">
-            <span className="font-heading text-lg font-bold text-brand-primary">B</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 px-2">
-            <img src={branding.logo} alt={branding.company} className="h-8" />
-            <span className="font-heading text-lg font-semibold text-brand-primary">
-              {branding.name}
+            <span className="font-heading text-lg font-bold text-brand-primary">
+              {activeTenant?.name?.[0] || 'B'}
             </span>
           </div>
-        )}
-      </SidebarHeader>
+        </SidebarHeader>
+      ) : (
+        <SidebarHeader>
+          <Dropdown>
+            <DropdownButton as="button" className="flex items-center gap-3 px-2 w-full text-left rounded-lg hover:bg-zinc-950/5 py-2 transition-colors">
+              <img src={branding.logo} alt={branding.company} className="h-8 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-heading text-sm font-semibold text-brand-primary truncate">
+                  {activeTenant?.name || branding.name}
+                </div>
+                <div className="text-[10px] text-gray-400 truncate">{activeTenant?.industry}</div>
+              </div>
+              <svg className="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+              </svg>
+            </DropdownButton>
+            <DropdownMenu anchor="bottom start" className="min-w-[240px]">
+              {tenants.map((t) => (
+                <DropdownItem key={t.id} onClick={() => setActiveTenant(t)}>
+                  <div>
+                    <div className="font-medium text-sm">{t.name}</div>
+                    <div className="text-xs text-gray-500">{t.industry}</div>
+                  </div>
+                </DropdownItem>
+              ))}
+            </DropdownMenu>
+          </Dropdown>
+        </SidebarHeader>
+      )}
       <SidebarBody>
         <SidebarSection>
           {navItems.map((item) => (

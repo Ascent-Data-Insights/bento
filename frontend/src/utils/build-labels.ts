@@ -5,12 +5,16 @@ export const attributeLabels: Record<string, string> = {
   mower: 'Mower',
   hedger: 'Hedger',
   mulch: 'Mulch',
+  refrigerated: 'Refrigerated',
+  ambient: 'Ambient',
 }
 
 export const compartmentLabels: Record<string, string> = {
   cab: 'Cab',
   bed: 'Truck Bed',
   trailer: 'Trailer',
+  refrigerated: 'Refrigerated',
+  ambient: 'Ambient',
 }
 
 export function formatAttributeValue(value: string | string[] | boolean | number): string {

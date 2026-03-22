@@ -11,13 +11,13 @@ import type {
   DisplayLabels,
 } from '../types/api'
 import {
-  fetchTenants,
   fetchLocations,
   fetchVehicles,
   fetchResources,
   fetchJobs,
   solveFromDb,
 } from '../api/client'
+import { useTenant } from '../contexts/TenantContext'
 import { buildLabels } from '../utils/build-labels'
 import { RouteMap } from '../components/RouteMap'
 import { DetailPanel } from '../components/DetailPanel'
@@ -82,7 +82,7 @@ function buildModuleData(jobs: JobResponse[]): Record<string, unknown> {
 }
 
 export function DashboardPage() {
-  const [tenantId, setTenantId] = useState<string | null>(null)
+  const { activeTenant, loading: tenantLoading } = useTenant()
   const [dataLoading, setDataLoading] = useState(true)
   const [solveResult, setSolveResult] = useState<SolveResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -99,26 +99,25 @@ export function DashboardPage() {
 
   const todayDate = getTodayDate()
 
-  // Load tenant data on mount
   useEffect(() => {
+    if (!activeTenant) return
+
+    // Reset state on tenant change
+    setSolveResult(null)
+    setSelectedRoute(null)
+    setFocusLocation(null)
+    setError(null)
+    setDataLoading(true)
+
     let cancelled = false
     const load = async () => {
       try {
-        const tenants = await fetchTenants()
-        if (cancelled || tenants.length === 0) {
-          setDataLoading(false)
-          return
-        }
-        const tid = tenants[0].id
-        if (!cancelled) setTenantId(tid)
-
         const [locs, vehs, ress, jbs] = await Promise.all([
-          fetchLocations(tid),
-          fetchVehicles(tid),
-          fetchResources(tid),
-          fetchJobs(tid, todayDate),
+          fetchLocations(activeTenant.id),
+          fetchVehicles(activeTenant.id),
+          fetchResources(activeTenant.id),
+          fetchJobs(activeTenant.id, todayDate),
         ])
-
         if (!cancelled) {
           setLocations(locs)
           setVehicles(vehs)
@@ -136,7 +135,7 @@ export function DashboardPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [todayDate])
+  }, [activeTenant?.id, todayDate])
 
   const depotIds = new Set(
     vehicles.flatMap((v) =>
@@ -152,7 +151,7 @@ export function DashboardPage() {
   }
 
   const handleOptimize = async () => {
-    if (!tenantId) return
+    if (!activeTenant) return
     setLoading(true)
     setError(null)
     setSolveResult(null)
@@ -160,7 +159,7 @@ export function DashboardPage() {
     setFocusLocation(null)
 
     try {
-      const result = await solveFromDb(tenantId, todayDate)
+      const result = await solveFromDb(activeTenant.id, todayDate)
       setSolveResult(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Optimization failed')
@@ -175,7 +174,7 @@ export function DashboardPage() {
   const mapResources = toMapResources(resources)
   const moduleData = buildModuleData(jobs)
 
-  if (dataLoading) {
+  if (tenantLoading || dataLoading) {
     return (
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="flex items-center gap-3 text-gray-500">

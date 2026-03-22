@@ -48,12 +48,20 @@ function PreSolveView({
   onFocusLocation?: (locationId: string) => void
   labels: DisplayLabels
 }) {
+  const consumed = resources.filter((r) => !r.stays_with_vehicle)
+  const dropoffMap = new Map<string, Resource[]>()
+  for (const r of consumed) {
+    if (r.dropoff_location_id) {
+      const list = dropoffMap.get(r.dropoff_location_id) || []
+      list.push(r)
+      dropoffMap.set(r.dropoff_location_id, list)
+    }
+  }
   const jobSites = locations.filter(
-    (l) => l.required_resources && l.required_resources.length > 0
+    (l) => (l.required_resources && l.required_resources.length > 0) || dropoffMap.has(l.id)
   )
   const workers = resources.filter((r) => r.stays_with_vehicle && r.attributes?.skill)
   const mowers = resources.filter((r) => r.stays_with_vehicle && r.attributes?.type === 'mower')
-  const consumed = resources.filter((r) => !r.stays_with_vehicle)
 
   // Get time windows from module data
   const twData = moduleData?.time_windows as { windows?: { location_id: string; earliest: number; latest: number }[] } | undefined
@@ -117,6 +125,11 @@ function PreSolveView({
                       </Badge>
                     )
                   })}
+                  {(dropoffMap.get(loc.id) || []).map((r) => (
+                    <Badge key={r.id} color="amber">
+                      {r.quantity && r.quantity > 1 ? `${r.quantity}× ` : ''}{labels.resources[r.id] || r.id}
+                    </Badge>
+                  ))}
                 </div>
               </button>
             )
@@ -273,7 +286,8 @@ function PostSolveView({
                 {isSelected && (
                   <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
                     {route.stops.map((stop, si) => {
-                      const arrival = vehicleArrivals?.[stop.location_id]
+                      const isDepot = depotIds.has(stop.location_id)
+                      const arrival = isDepot ? null : vehicleArrivals?.[stop.location_id]
                       return (
                         <div key={si} className="flex items-start gap-2 text-xs">
                           <div className="w-14 shrink-0 text-gray-400 text-right pt-0.5">

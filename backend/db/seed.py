@@ -253,10 +253,10 @@ def seed_fresh_fleet(db, seed_date: date) -> None:
     db.add(tenant)
     db.flush()
 
-    # Depot — warehouse on Cincinnati west side
+    # Depot — warehouse in Fairfield industrial park (northwest of Cincinnati)
     warehouse = Location(
         tenant_id=tenant.id, name="Fresh Fleet Warehouse",
-        latitude=39.1031, longitude=-84.5120, service_time=0,
+        latitude=39.3455, longitude=-84.5407, service_time=0,
     )
 
     # Delivery locations
@@ -359,23 +359,20 @@ def seed_fresh_fleet(db, seed_date: date) -> None:
         ("Deliver to Garcia", "Fresh produce box — refrigerated"),
     ]
     time_windows = [
-        (480, 600),   # 8am-10am
-        (540, 660),   # 9am-11am
-        (600, 720),   # 10am-12pm
-        (660, 780),   # 11am-1pm
-        (720, 840),   # 12pm-2pm
-        (780, 900),   # 1pm-3pm
+        (480, 510),   # Martinez (Hyde Park): 8:00-8:30am — very tight
+        (480, 510),   # Chen (Clifton): 8:00-8:30am — same 30min window, other side of town
+        (480, 510),   # Patel (Oakley): 8:00-8:30am — 3 deliveries at once, forces 3 vans
+        (600, 660),   # Thompson (Anderson): 10am-11am
+        (600, 660),   # Williams (Mt. Lookout): 10am-11am
+        (720, 780),   # Garcia (Norwood): 12pm-1pm
     ]
 
     for loc, (name, desc), (tw_e, tw_l) in zip(delivery_locs, delivery_names, time_windows):
-        # Figure out required resource type based on the package for this location
-        pkg = next(p for p in packages if p.dropoff_location_id == loc.id)
-        req_type = pkg.attributes.get("type", "ambient")
         job = Job(
             tenant_id=tenant.id, location_id=loc.id, date=seed_date,
             name=name, description=desc,
             service_time=loc.service_time,
-            required_resources=[{"attributes": {"type": req_type}, "quantity": 1}],
+            required_resources=[],
             time_window_earliest=tw_e, time_window_latest=tw_l,
         )
         db.add(job)

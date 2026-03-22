@@ -28,14 +28,19 @@ function getTodayDate(): string {
 }
 
 // Convert API LocationResponse to solver Location type for the map
-function toMapLocations(locs: LocationResponse[]): Location[] {
-  return locs.map((l) => ({
-    id: l.id,
-    latitude: l.latitude,
-    longitude: l.longitude,
-    service_time: l.service_time,
-    required_resources: l.required_resources,
-  }))
+// Merges job data (requirements, service_time) onto locations for today's view
+function toMapLocations(locs: LocationResponse[], jobs: JobResponse[]): Location[] {
+  const jobByLocation = new Map(jobs.map((j) => [j.location_id, j]))
+  return locs.map((l) => {
+    const job = jobByLocation.get(l.id)
+    return {
+      id: l.id,
+      latitude: l.latitude,
+      longitude: l.longitude,
+      service_time: job?.service_time ?? l.service_time,
+      required_resources: job?.required_resources ?? l.required_resources,
+    }
+  })
 }
 
 // Convert API VehicleResponse to solver Vehicle type
@@ -165,7 +170,7 @@ export function DashboardPage() {
   }
 
   // Convert to map-compatible types
-  const mapLocations = toMapLocations(locations)
+  const mapLocations = toMapLocations(locations, jobs)
   const mapVehicles = toMapVehicles(vehicles)
   const mapResources = toMapResources(resources)
   const moduleData = buildModuleData(jobs)

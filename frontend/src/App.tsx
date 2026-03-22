@@ -5,8 +5,9 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppLayout } from './layouts/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
-import { RoutesPage } from './pages/RoutesPage'
-import { FleetPage } from './pages/FleetPage'
+import { CrewSchedulePage } from './pages/CrewSchedulePage'
+import { ProfileBuilderPage } from './pages/ProfileBuilderPage'
+import { AdminPage } from './pages/AdminPage'
 
 export default function App() {
   return (
@@ -18,8 +19,9 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<DashboardPage />} />
-                <Route path="/routes" element={<RoutesPage />} />
-                <Route path="/fleet" element={<FleetPage />} />
+                <Route path="/crew" element={<CrewSchedulePage />} />
+                <Route path="/onboard" element={<ProfileBuilderPage />} />
+                <Route path="/admin" element={<AdminPage />} />
               </Route>
             </Route>
           </Routes>

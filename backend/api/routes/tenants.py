@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from backend.db import get_db
@@ -32,3 +32,13 @@ def get_tenant(tenant_id: uuid.UUID, db: Session = Depends(get_db)) -> Tenant:
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
     return tenant
+
+
+@router.delete("/tenants/{tenant_id}", status_code=204)
+def delete_tenant(tenant_id: uuid.UUID, db: Session = Depends(get_db)) -> Response:
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    db.delete(tenant)
+    db.commit()
+    return Response(status_code=204)

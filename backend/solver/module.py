@@ -20,6 +20,8 @@ class ModuleMetadata:
 class ConstraintModule(ABC):
     """Abstract base class for all constraint modules (built-in and custom)."""
 
+    implemented: bool = True
+
     @abstractmethod
     def get_metadata(self) -> ModuleMetadata:
         """Return static metadata about this module."""

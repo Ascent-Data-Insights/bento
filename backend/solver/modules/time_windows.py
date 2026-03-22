@@ -28,6 +28,7 @@ class TimeWindowsData(BaseModel):
 
 @register
 class TimeWindowsModule(ConstraintModule):
+    implemented: bool = True
 
     def get_metadata(self) -> ModuleMetadata:
         return ModuleMetadata(

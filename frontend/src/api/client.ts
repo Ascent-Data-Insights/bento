@@ -6,6 +6,9 @@ import type {
   VehicleResponse,
   ResourceResponse,
   JobResponse,
+  ModuleMetadata,
+  OnboardRequest,
+  OnboardResponse,
 } from '../types/api'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -69,6 +72,34 @@ export async function solveFromDb(tenantId: string, date: string): Promise<Solve
     const errorData = await response.json().catch(() => ({}))
     const detail = errorData?.detail
     const message = typeof detail === 'string' ? detail : detail?.message || `Solver returned ${response.status}`
+    throw new Error(message)
+  }
+  return response.json()
+}
+
+export async function fetchModules(): Promise<ModuleMetadata[]> {
+  const response = await fetch(`${API_BASE}/api/v1/modules`)
+  if (!response.ok) throw new Error(`Failed to fetch modules: ${response.status}`)
+  return response.json()
+}
+
+export async function deleteTenant(tenantId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/v1/tenants/${tenantId}`, {
+    method: 'DELETE',
+  })
+  if (!response.ok) throw new Error(`Failed to delete tenant: ${response.status}`)
+}
+
+export async function onboardTenant(body: OnboardRequest): Promise<OnboardResponse> {
+  const response = await fetch(`${API_BASE}/api/v1/tenants/onboard`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    const detail = errorData?.detail
+    const message = typeof detail === 'string' ? detail : detail?.message || `Onboarding failed: ${response.status}`
     throw new Error(message)
   }
   return response.json()

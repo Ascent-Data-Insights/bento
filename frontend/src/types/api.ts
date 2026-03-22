@@ -176,3 +176,27 @@ export interface DisplayLabels {
   vehicles: Record<string, string>
   resources: Record<string, string>
 }
+
+export interface ModuleMetadata {
+  key: string
+  name: string
+  description: string
+  dependencies: string[]
+  conflicts: string[]
+  required_dimensions: Record<string, string[]>
+  implemented: boolean
+}
+
+export interface OnboardRequest {
+  tenant_name: string
+  industry: string
+  profile_name: string
+  dimensions: DimensionSelections
+  objective: Record<string, number>
+  modules: ModuleConfig[]
+}
+
+export interface OnboardResponse {
+  tenant: TenantResponse
+  profile: Record<string, unknown>
+}

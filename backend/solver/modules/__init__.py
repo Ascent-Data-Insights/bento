@@ -13,3 +13,6 @@ def register(cls: type[ConstraintModule]) -> type[ConstraintModule]:
 # Import modules to trigger @register
 from backend.solver.modules import time_windows  # noqa: F401
 from backend.solver.modules import co_delivery  # noqa: F401
+from backend.solver.modules import ev_fuel  # noqa: F401
+from backend.solver.modules import shift_limits  # noqa: F401
+from backend.solver.modules import priority_sla  # noqa: F401

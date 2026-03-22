@@ -20,6 +20,7 @@ class CoDeliveryData(BaseModel):
 
 @register
 class CoDeliveryModule(ConstraintModule):
+    implemented: bool = True
 
     def get_metadata(self) -> ModuleMetadata:
         return ModuleMetadata(

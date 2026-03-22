@@ -18,10 +18,15 @@ RUN uv sync --no-dev --no-install-project
 
 # Copy application code
 COPY backend/ backend/
+COPY alembic/ alembic/
+COPY alembic.ini ./
 
 # Install the project itself
 RUN uv sync --no-dev
 
+COPY scripts/entrypoint.sh ./entrypoint.sh
+RUN chmod +x entrypoint.sh
+
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["./entrypoint.sh"]

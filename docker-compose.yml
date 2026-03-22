@@ -9,6 +9,11 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U routing -d routing"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   api:
     build: .
@@ -21,7 +26,8 @@ services:
       - ROUTING_DATABASE_URL=postgresql://routing:routing@postgres:5432/routing
       - ROUTING_OSRM_BASE_URL=https://router.project-osrm.org
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   frontend:
     build: ./frontend

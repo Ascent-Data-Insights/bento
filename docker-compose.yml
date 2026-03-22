@@ -1,4 +1,15 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: routing
+      POSTGRES_USER: routing
+      POSTGRES_PASSWORD: routing
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
   api:
     build: .
     ports:
@@ -7,6 +18,11 @@ services:
       - ROUTING_SOLVER_NAME=cbc
       - ROUTING_SOLVER_TIME_LIMIT=300
       - ROUTING_LOG_LEVEL=INFO
+      - ROUTING_DATABASE_URL=postgresql://routing:routing@postgres:5432/routing
+      - ROUTING_OSRM_BASE_URL=https://router.project-osrm.org
+    depends_on:
+      - postgres
+
   frontend:
     build: ./frontend
     ports:
@@ -14,3 +30,6 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+
+volumes:
+  pgdata:

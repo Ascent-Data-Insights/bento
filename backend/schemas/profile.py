@@ -1,3 +1,5 @@
+import uuid
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
@@ -33,3 +35,25 @@ class ClientProfile(BaseModel):
     dimensions: DimensionSelections
     objective: dict[str, float] = Field(..., min_length=1)
     modules: list[ModuleConfig] = []
+
+
+class ProfileCreate(BaseModel):
+    name: str
+    dimensions: DimensionSelections
+    objective: dict[str, float] = Field(..., min_length=1)
+    modules: list[ModuleConfig] = []
+
+
+class ProfileResponse(BaseModel):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    name: str
+    origin_model: str
+    fleet_composition: str
+    objective: dict[str, float]
+    modules: list[dict[str, Any]]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

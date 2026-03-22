@@ -100,3 +100,79 @@ export interface SolveRequestBody {
   request: SolveRequest
   profile: ClientProfile
 }
+
+export interface TenantResponse {
+  id: string
+  name: string
+  industry: string
+  branding: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface LocationResponse {
+  id: string
+  tenant_id: string
+  name: string
+  latitude: number
+  longitude: number
+  service_time: number
+  required_resources: ResourceRequirement[]
+  external_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface VehicleResponse {
+  id: string
+  tenant_id: string
+  name: string
+  start_location_id: string
+  end_location_id: string | null
+  compartments: Compartment[]
+  is_active: boolean
+  external_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ResourceResponse {
+  id: string
+  tenant_id: string
+  name: string
+  pickup_location_id: string
+  dropoff_location_id: string | null
+  compartment_types: string[]
+  capacity_consumption: Record<string, number>
+  quantity: number
+  stays_with_vehicle: boolean
+  attributes: Record<string, string | string[] | boolean | number>
+  is_active: boolean
+  external_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface JobResponse {
+  id: string
+  tenant_id: string
+  location_id: string
+  date: string
+  name: string
+  description: string | null
+  service_time: number
+  required_resources: ResourceRequirement[]
+  time_window_earliest: number | null
+  time_window_latest: number | null
+  status: string
+  external_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface DisplayLabels {
+  locations: Record<string, string>
+  locationDescriptions: Record<string, string>
+  vehicles: Record<string, string>
+  resources: Record<string, string>
+}

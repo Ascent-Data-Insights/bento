@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import type { Location, Route } from '../types/api'
+import type { Location, Route, DisplayLabels } from '../types/api'
 import { getRouteColor } from '../utils/route-colors'
-import { locationLabels, locationDescriptions, formatAttributeValue } from '../data/grasscutting-demo'
+import { formatAttributeValue } from '../utils/build-labels'
 import { fetchRouteGeometry } from '../api/matrices'
 
 // Circle marker with a Lucide icon inside
@@ -128,6 +128,7 @@ interface RouteMapProps {
   selectedRoute?: string | null
   onSelectRoute?: (vehicleId: string | null) => void
   focusLocationId?: string | null
+  labels: DisplayLabels
 }
 
 export function RouteMap({
@@ -137,6 +138,7 @@ export function RouteMap({
   selectedRoute,
   onSelectRoute,
   focusLocationId,
+  labels,
 }: RouteMapProps) {
   const locationMap = new Map(locations.map((l) => [l.id, l]))
   const [roadGeometries, setRoadGeometries] = useState<Record<string, [number, number][]>>({})
@@ -247,13 +249,13 @@ export function RouteMap({
             <Popup>
               <div className="font-body text-sm min-w-[160px]">
                 <div className="font-semibold text-brand-primary">
-                  {locationLabels[loc.id] || loc.id}
+                  {labels.locations[loc.id] || loc.id}
                 </div>
                 {isDepot && (
                   <div className="text-xs text-gray-500 mt-0.5">Depot</div>
                 )}
-                {locationDescriptions[loc.id] && (
-                  <div className="text-xs text-gray-500 mt-0.5">{locationDescriptions[loc.id]}</div>
+                {labels.locationDescriptions[loc.id] && (
+                  <div className="text-xs text-gray-500 mt-0.5">{labels.locationDescriptions[loc.id]}</div>
                 )}
                 {loc.service_time ? (
                   <div className="text-xs text-gray-600 mt-1">

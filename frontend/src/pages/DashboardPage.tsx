@@ -1,50 +1,143 @@
 import { useEffect, useState } from 'react'
-import type { SolveResponse } from '../types/api'
-import { solveRoutes } from '../api/client'
-import { computeMatrices } from '../api/matrices'
+import type {
+  SolveResponse,
+  Location,
+  Vehicle,
+  Resource,
+  LocationResponse,
+  VehicleResponse,
+  ResourceResponse,
+  JobResponse,
+  DisplayLabels,
+} from '../types/api'
 import {
-  demoLocations,
-  demoVehicles,
-  demoResources,
-  demoSolveRequestBody,
-} from '../data/grasscutting-demo'
+  fetchTenants,
+  fetchLocations,
+  fetchVehicles,
+  fetchResources,
+  fetchJobs,
+  solveFromDb,
+} from '../api/client'
+import { buildLabels } from '../utils/build-labels'
 import { RouteMap } from '../components/RouteMap'
 import { DetailPanel } from '../components/DetailPanel'
 
-const depotIds = new Set(
-  demoVehicles.flatMap((v) =>
-    [v.start_location_id, v.end_location_id].filter((id): id is string => id != null)
-  )
-)
+function getTodayDate(): string {
+  const d = new Date()
+  return d.toISOString().split('T')[0]
+}
+
+// Convert API LocationResponse to solver Location type for the map
+function toMapLocations(locs: LocationResponse[]): Location[] {
+  return locs.map((l) => ({
+    id: l.id,
+    latitude: l.latitude,
+    longitude: l.longitude,
+    service_time: l.service_time,
+    required_resources: l.required_resources,
+  }))
+}
+
+// Convert API VehicleResponse to solver Vehicle type
+function toMapVehicles(vehicles: VehicleResponse[]): Vehicle[] {
+  return vehicles.map((v) => ({
+    id: v.id,
+    start_location_id: v.start_location_id,
+    end_location_id: v.end_location_id,
+    compartments: v.compartments,
+  }))
+}
+
+// Convert API ResourceResponse to solver Resource type
+function toMapResources(resources: ResourceResponse[]): Resource[] {
+  return resources.map((r) => ({
+    id: r.id,
+    pickup_location_id: r.pickup_location_id,
+    dropoff_location_id: r.dropoff_location_id,
+    compartment_types: r.compartment_types,
+    capacity_consumption: r.capacity_consumption,
+    quantity: r.quantity,
+    stays_with_vehicle: r.stays_with_vehicle,
+    attributes: r.attributes,
+  }))
+}
+
+// Build module_data for pre-solve display from jobs
+function buildModuleData(jobs: JobResponse[]): Record<string, unknown> {
+  const windows = jobs
+    .filter((j) => j.time_window_earliest != null && j.time_window_latest != null)
+    .map((j) => ({
+      location_id: j.location_id,
+      earliest: j.time_window_earliest!,
+      latest: j.time_window_latest!,
+    }))
+  return {
+    time_windows: { windows },
+  }
+}
 
 export function DashboardPage() {
+  const [tenantId, setTenantId] = useState<string | null>(null)
+  const [dataLoading, setDataLoading] = useState(true)
   const [solveResult, setSolveResult] = useState<SolveResponse | null>(null)
   const [loading, setLoading] = useState(false)
-  const [matricesLoading, setMatricesLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null)
   const [focusLocation, setFocusLocation] = useState<string | null>(null)
-  const [matrices, setMatrices] = useState<Record<string, Record<string, Record<string, number>>> | null>(null)
 
-  // Compute real matrices from OSRM on mount
+  // API data
+  const [locations, setLocations] = useState<LocationResponse[]>([])
+  const [vehicles, setVehicles] = useState<VehicleResponse[]>([])
+  const [resources, setResources] = useState<ResourceResponse[]>([])
+  const [jobs, setJobs] = useState<JobResponse[]>([])
+  const [labels, setLabels] = useState<DisplayLabels | null>(null)
+
+  const todayDate = getTodayDate()
+
+  // Load tenant data on mount
   useEffect(() => {
     let cancelled = false
-    computeMatrices(demoLocations)
-      .then((result) => {
-        if (!cancelled) {
-          setMatrices(result)
-          setMatricesLoading(false)
+    const load = async () => {
+      try {
+        const tenants = await fetchTenants()
+        if (cancelled || tenants.length === 0) {
+          setDataLoading(false)
+          return
         }
-      })
-      .catch((err) => {
+        const tid = tenants[0].id
+        if (!cancelled) setTenantId(tid)
+
+        const [locs, vehs, ress, jbs] = await Promise.all([
+          fetchLocations(tid),
+          fetchVehicles(tid),
+          fetchResources(tid),
+          fetchJobs(tid, todayDate),
+        ])
+
         if (!cancelled) {
-          console.warn('OSRM failed, falling back to demo matrices:', err)
-          setMatrices(demoSolveRequestBody.request.matrices)
-          setMatricesLoading(false)
+          setLocations(locs)
+          setVehicles(vehs)
+          setResources(ress)
+          setJobs(jbs)
+          setLabels(buildLabels(locs, vehs, ress, jbs))
+          setDataLoading(false)
         }
-      })
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load data')
+          setDataLoading(false)
+        }
+      }
+    }
+    load()
     return () => { cancelled = true }
-  }, [])
+  }, [todayDate])
+
+  const depotIds = new Set(
+    vehicles.flatMap((v) =>
+      [v.start_location_id, v.end_location_id].filter((id): id is string => id != null)
+    )
+  )
 
   const handleReset = () => {
     setSolveResult(null)
@@ -54,7 +147,7 @@ export function DashboardPage() {
   }
 
   const handleOptimize = async () => {
-    if (!matrices) return
+    if (!tenantId) return
     setLoading(true)
     setError(null)
     setSolveResult(null)
@@ -62,15 +155,7 @@ export function DashboardPage() {
     setFocusLocation(null)
 
     try {
-      // Build the request with real OSRM matrices
-      const requestBody = {
-        ...demoSolveRequestBody,
-        request: {
-          ...demoSolveRequestBody.request,
-          matrices,
-        },
-      }
-      const result = await solveRoutes(requestBody)
+      const result = await solveFromDb(tenantId, todayDate)
       setSolveResult(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Optimization failed')
@@ -79,34 +164,51 @@ export function DashboardPage() {
     }
   }
 
+  // Convert to map-compatible types
+  const mapLocations = toMapLocations(locations)
+  const mapVehicles = toMapVehicles(vehicles)
+  const mapResources = toMapResources(resources)
+  const moduleData = buildModuleData(jobs)
+
+  if (dataLoading) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-gray-500">
+          <svg className="animate-spin h-5 w-5 text-brand-secondary" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Loading...
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="absolute inset-0 flex">
       {/* Map */}
       <div className="flex-1 relative">
         <RouteMap
-          locations={demoLocations}
+          locations={mapLocations}
           depotIds={depotIds}
           routes={solveResult?.routes}
           selectedRoute={selectedRoute}
           onSelectRoute={setSelectedRoute}
           focusLocationId={focusLocation}
+          labels={labels || { locations: {}, locationDescriptions: {}, vehicles: {}, resources: {} }}
         />
 
-        {/* Matrix loading indicator */}
-        {matricesLoading && (
+        {/* No jobs message */}
+        {!dataLoading && jobs.length === 0 && !solveResult && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[450]">
-            <div className="rounded-full bg-white/90 backdrop-blur-sm shadow-lg px-4 py-2 flex items-center gap-2 text-sm text-gray-600">
-              <svg className="animate-spin h-4 w-4 text-brand-secondary" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Computing driving distances…
+            <div className="rounded-lg bg-white/90 backdrop-blur-sm shadow-lg px-4 py-3 text-sm text-gray-600">
+              No jobs scheduled for today
             </div>
           </div>
         )}
 
-        {/* Floating optimize bar — bottom center over the map */}
-        {!solveResult && !matricesLoading && (
+        {/* Floating optimize bar */}
+        {!solveResult && !dataLoading && jobs.length > 0 && (
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[450]">
             <button
               onClick={handleOptimize}
@@ -128,7 +230,7 @@ export function DashboardPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Optimizing Routes…
+                  Optimizing…
                 </>
               ) : (
                 <>
@@ -142,7 +244,7 @@ export function DashboardPage() {
           </div>
         )}
 
-        {/* Error banner — floating over map */}
+        {/* Error banner */}
         {error && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[450] max-w-md w-full">
             <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 shadow-lg flex items-start gap-3">
@@ -150,7 +252,7 @@ export function DashboardPage() {
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
               </svg>
               <div className="flex-1">
-                <p className="text-sm font-medium text-red-800">Optimization failed</p>
+                <p className="text-sm font-medium text-red-800">Error</p>
                 <p className="text-xs text-red-600 mt-0.5">{error}</p>
               </div>
               <button
@@ -169,15 +271,17 @@ export function DashboardPage() {
       {/* Detail Panel */}
       <div className="w-[360px] shrink-0">
         <DetailPanel
-          locations={demoLocations}
-          vehicles={demoVehicles}
-          resources={demoResources}
+          locations={mapLocations}
+          vehicles={mapVehicles}
+          resources={mapResources}
           solveResult={solveResult}
           selectedRoute={selectedRoute}
           onSelectRoute={setSelectedRoute}
           onFocusLocation={setFocusLocation}
           onReset={handleReset}
-          moduleData={demoSolveRequestBody.request.module_data}
+          labels={labels || { locations: {}, locationDescriptions: {}, vehicles: {}, resources: {} }}
+          depotIds={depotIds}
+          moduleData={moduleData}
         />
       </div>
     </div>

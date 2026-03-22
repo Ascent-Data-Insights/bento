@@ -1,16 +1,8 @@
 import { Badge } from './badge'
-import type { Location, Vehicle, Resource, SolveResponse, Route } from '../types/api'
+import type { Location, Vehicle, Resource, SolveResponse, Route, DisplayLabels } from '../types/api'
 import { SolveStatus } from '../types/api'
 import { getRouteColor } from '../utils/route-colors'
-import {
-  locationLabels,
-  locationDescriptions,
-  resourceLabels,
-  vehicleLabels,
-  compartmentLabels,
-  formatTime,
-  formatAttributeValue,
-} from '../data/grasscutting-demo'
+import { compartmentLabels, formatTime, formatAttributeValue } from '../utils/build-labels'
 
 interface DetailPanelProps {
   locations: Location[]
@@ -22,6 +14,8 @@ interface DetailPanelProps {
   onFocusLocation?: (locationId: string) => void
   onReset?: () => void
   moduleData?: Record<string, unknown>
+  labels: DisplayLabels
+  depotIds: Set<string>
 }
 
 function StatusBadge({ status }: { status: SolveStatus }) {
@@ -45,12 +39,14 @@ function PreSolveView({
   resources,
   moduleData,
   onFocusLocation,
+  labels,
 }: {
   locations: Location[]
   vehicles: Vehicle[]
   resources: Resource[]
   moduleData?: Record<string, unknown>
   onFocusLocation?: (locationId: string) => void
+  labels: DisplayLabels
 }) {
   const jobSites = locations.filter(
     (l) => l.required_resources && l.required_resources.length > 0
@@ -97,14 +93,14 @@ function PreSolveView({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="font-medium text-sm text-gray-900 leading-tight">
-                    {locationLabels[loc.id] || loc.id}
+                    {labels.locations[loc.id] || loc.id}
                   </div>
                   <span className="shrink-0 text-[11px] text-gray-400">
                     {loc.service_time} min
                   </span>
                 </div>
-                {locationDescriptions[loc.id] && (
-                  <p className="text-xs text-gray-500 mt-0.5">{locationDescriptions[loc.id]}</p>
+                {labels.locationDescriptions[loc.id] && (
+                  <p className="text-xs text-gray-500 mt-0.5">{labels.locationDescriptions[loc.id]}</p>
                 )}
                 {tw && (
                   <div className="mt-1 text-[11px] text-gray-500">
@@ -135,7 +131,7 @@ function PreSolveView({
           {vehicles.map((v) => (
             <div key={v.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
               <span className="text-sm font-medium text-gray-700">
-                {vehicleLabels[v.id] || v.id}
+                {labels.vehicles[v.id] || v.id}
               </span>
               <div className="flex gap-1">
                 {v.compartments.map((c, i) => (
@@ -152,14 +148,14 @@ function PreSolveView({
         <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Resources</h4>
         <div className="flex flex-wrap gap-1.5">
           {workers.map((r) => (
-            <Badge key={r.id} color="sky">{resourceLabels[r.id] || r.id}</Badge>
+            <Badge key={r.id} color="sky">{labels.resources[r.id] || r.id}</Badge>
           ))}
           {mowers.map((r) => (
-            <Badge key={r.id} color="emerald">{resourceLabels[r.id] || r.id}</Badge>
+            <Badge key={r.id} color="emerald">{labels.resources[r.id] || r.id}</Badge>
           ))}
           {consumed.map((r) => (
             <Badge key={r.id} color="amber">
-              {resourceLabels[r.id] || r.id}{r.quantity && r.quantity > 1 ? ` ×${r.quantity}` : ''}
+              {labels.resources[r.id] || r.id}{r.quantity && r.quantity > 1 ? ` ×${r.quantity}` : ''}
             </Badge>
           ))}
         </div>
@@ -174,12 +170,16 @@ function PostSolveView({
   selectedRoute,
   onSelectRoute,
   onReset,
+  labels,
+  depotIds,
 }: {
   solveResult: SolveResponse
   routes: Route[]
   selectedRoute: string | null
   onSelectRoute: (vehicleId: string | null) => void
   onReset?: () => void
+  labels: DisplayLabels
+  depotIds: Set<string>
 }) {
   const arrivalTimes = (solveResult.module_results?.time_windows as { arrival_times?: Record<string, Record<string, number>> })?.arrival_times
 
@@ -240,7 +240,7 @@ function PostSolveView({
                     style={{ backgroundColor: color }}
                   />
                   <span className="font-semibold text-sm text-gray-900">
-                    {vehicleLabels[route.vehicle_id] || route.vehicle_id}
+                    {labels.vehicles[route.vehicle_id] || route.vehicle_id}
                   </span>
                   <span className="ml-auto text-xs text-gray-400">
                     {route.total_distance.toFixed(1)} mi
@@ -258,12 +258,12 @@ function PostSolveView({
                       )}
                       <span
                         className={`text-xs px-1.5 py-0.5 rounded ${
-                          stop.location_id === 'depot'
+                          depotIds.has(stop.location_id)
                             ? 'bg-brand-primary/10 text-brand-primary font-medium'
                             : 'bg-gray-100 text-gray-600'
                         }`}
                       >
-                        {locationLabels[stop.location_id]?.split(' ')[0] || stop.location_id}
+                        {labels.locations[stop.location_id]?.split(' ')[0] || stop.location_id}
                       </span>
                     </span>
                   ))}
@@ -281,20 +281,20 @@ function PostSolveView({
                           </div>
                           <div
                             className="w-2 h-2 rounded-full mt-1 shrink-0"
-                            style={{ backgroundColor: stop.location_id === 'depot' ? '#03344E' : color }}
+                            style={{ backgroundColor: depotIds.has(stop.location_id) ? '#03344E' : color }}
                           />
                           <div className="flex-1">
                             <div className="font-medium text-gray-700">
-                              {locationLabels[stop.location_id] || stop.location_id}
+                              {labels.locations[stop.location_id] || stop.location_id}
                             </div>
                             {stop.resources_picked_up.length > 0 && (
                               <div className="text-gray-500 mt-0.5">
-                                ↑ {stop.resources_picked_up.map((r) => resourceLabels[r] || r).join(', ')}
+                                ↑ {stop.resources_picked_up.map((r) => labels.resources[r] || r).join(', ')}
                               </div>
                             )}
                             {stop.resources_dropped_off.length > 0 && (
                               <div className="text-gray-500 mt-0.5">
-                                ↓ {stop.resources_dropped_off.map((r) => resourceLabels[r] || r).join(', ')}
+                                ↓ {stop.resources_dropped_off.map((r) => labels.resources[r] || r).join(', ')}
                               </div>
                             )}
                           </div>
@@ -322,6 +322,8 @@ export function DetailPanel({
   onFocusLocation,
   onReset,
   moduleData,
+  labels,
+  depotIds,
 }: DetailPanelProps) {
   return (
     <div className="h-full flex flex-col bg-white/95 backdrop-blur-sm border-l border-gray-200 shadow-lg">
@@ -341,6 +343,8 @@ export function DetailPanel({
             selectedRoute={selectedRoute}
             onSelectRoute={onSelectRoute}
             onReset={onReset}
+            labels={labels}
+            depotIds={depotIds}
           />
         ) : (
           <PreSolveView
@@ -349,6 +353,7 @@ export function DetailPanel({
             resources={resources}
             moduleData={moduleData}
             onFocusLocation={onFocusLocation}
+            labels={labels}
           />
         )}
       </div>

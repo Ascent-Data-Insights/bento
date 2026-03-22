@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Badge } from './badge'
 import type { Location, Vehicle, Resource, SolveResponse, Route, DisplayLabels } from '../types/api'
 import { SolveStatus } from '../types/api'
@@ -48,6 +49,7 @@ function PreSolveView({
   onFocusLocation?: (locationId: string) => void
   labels: DisplayLabels
 }) {
+  const [expandedVehicle, setExpandedVehicle] = useState<string | null>(null)
   const consumed = resources.filter((r) => !r.stays_with_vehicle)
   const dropoffMap = new Map<string, Resource[]>()
   for (const r of consumed) {
@@ -141,18 +143,62 @@ function PreSolveView({
       <div>
         <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Fleet</h4>
         <div className="space-y-1.5">
-          {vehicles.map((v) => (
-            <div key={v.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
-              <span className="text-sm font-medium text-gray-700">
-                {labels.vehicles[v.id] || v.id}
-              </span>
-              <div className="flex gap-1">
-                {v.compartments.map((c, i) => (
-                  <Badge key={i} color="zinc">{compartmentLabels[c.type] || c.type}</Badge>
-                ))}
+          {vehicles.map((v) => {
+            const isExpanded = expandedVehicle === v.id
+            return (
+              <div key={v.id} className="rounded-lg bg-gray-50 overflow-hidden">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  onClick={() => setExpandedVehicle(isExpanded ? null : v.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedVehicle(isExpanded ? null : v.id) } }}
+                  className="flex items-center justify-between w-full px-3 py-2 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <svg
+                      className={`w-3 h-3 text-gray-400 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span className="text-sm font-medium text-gray-700">
+                      {labels.vehicles[v.id] || v.id}
+                    </span>
+                  </div>
+                  <div className="flex gap-1">
+                    {v.compartments.map((c, i) => (
+                      <Badge key={i} color="zinc">{compartmentLabels[c.type] || c.type}</Badge>
+                    ))}
+                  </div>
+                </div>
+                {isExpanded && (
+                  <div className="px-3 pb-2 pt-0 border-t border-gray-200 space-y-1.5 mt-0">
+                    {v.compartments.map((c, i) => {
+                      const dims = Object.entries(c.capacity)
+                      if (dims.length === 0) return null
+                      return (
+                        <div key={i} className="rounded bg-white px-2.5 py-1.5 mt-1.5 first:mt-1.5">
+                          <div className="text-[11px] font-medium text-gray-500 mb-1">
+                            {compartmentLabels[c.type] || c.type}
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {dims.map(([dim, val]) => (
+                              <Badge key={dim} color="zinc">
+                                {dim.charAt(0).toUpperCase() + dim.slice(1)}: {val}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 

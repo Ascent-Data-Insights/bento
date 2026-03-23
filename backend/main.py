@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.config import settings
 from backend.api.routes.jobs import router as jobs_router
 from backend.api.routes.locations import router as locations_router
 from backend.api.routes.matrices import router as matrices_router
@@ -20,9 +21,15 @@ app = FastAPI(
     description="Modular vehicle routing optimization API.",
 )
 
+_cors_origins = (
+    ["*"]
+    if settings.cors_origins.strip() == "*"
+    else [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

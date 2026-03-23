@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     custom_modules_dir: Path = _BACKEND_DIR / "solver" / "custom"
     log_level: str = "INFO"
     osrm_base_url: str = "https://router.project-osrm.org"
+    cors_origins: str = "*"
 
     model_config = {"env_prefix": "ROUTING_"}
 

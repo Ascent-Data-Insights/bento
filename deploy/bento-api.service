@@ -1,0 +1,17 @@
+[Unit]
+Description=Bento API
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/bento
+EnvironmentFile=/root/bento/.env.production
+ExecStartPre=/root/.local/bin/uv run alembic upgrade head
+ExecStart=/root/.local/bin/uv run uvicorn backend.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

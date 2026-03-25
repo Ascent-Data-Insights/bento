@@ -11,7 +11,7 @@ import type {
   OnboardResponse,
 } from '../types/api'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
 export async function solveRoutes(body: SolveRequestBody): Promise<SolveResponse> {
   const response = await fetch(`${API_BASE}/api/v1/solve`, {

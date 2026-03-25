@@ -13,6 +13,15 @@ export function useSidebarCollapse() {
   return useContext(SidebarCollapseContext)
 }
 
+const MobileSidebarContext = createContext<{
+  open: boolean
+  setOpen: (open: boolean) => void
+}>({ open: false, setOpen: () => {} })
+
+export function useMobileSidebar() {
+  return useContext(MobileSidebarContext)
+}
+
 function OpenMenuIcon() {
   return (
     <svg data-slot="icon" viewBox="0 0 20 20" aria-hidden="true">
@@ -79,6 +88,7 @@ export function SidebarLayout({
   let [collapsed, setCollapsed] = useState(false)
 
   return (
+    <MobileSidebarContext.Provider value={{ open: showSidebar, setOpen: setShowSidebar }}>
     <SidebarCollapseContext.Provider value={{ collapsed, setCollapsed }}>
       <div className="relative isolate flex min-h-svh w-full bg-white max-lg:flex-col lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950">
         {/* Sidebar on desktop */}
@@ -122,5 +132,6 @@ export function SidebarLayout({
         </main>
       </div>
     </SidebarCollapseContext.Provider>
+    </MobileSidebarContext.Provider>
   )
 }

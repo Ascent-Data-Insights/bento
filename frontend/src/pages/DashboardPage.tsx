@@ -18,6 +18,7 @@ import {
   solveFromDb,
 } from '../api/client'
 import { useTenant } from '../contexts/TenantContext'
+import { useTour } from '../contexts/TourContext'
 import { buildLabels } from '../utils/build-labels'
 import { RouteMap } from '../components/RouteMap'
 import { DetailPanel } from '../components/DetailPanel'
@@ -83,12 +84,14 @@ function buildModuleData(jobs: JobResponse[]): Record<string, unknown> {
 
 export function DashboardPage() {
   const { activeTenant, loading: tenantLoading } = useTenant()
+  const { registerPrepareHandler } = useTour()
   const [dataLoading, setDataLoading] = useState(true)
   const [solveResult, setSolveResult] = useState<SolveResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null)
   const [focusLocation, setFocusLocation] = useState<string | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   // API data
   const [locations, setLocations] = useState<LocationResponse[]>([])
@@ -99,6 +102,11 @@ export function DashboardPage() {
 
   const todayDate = getTodayDate()
 
+  // Register tour handler: open the bottom sheet when the tour needs to show the detail panel
+  useEffect(() => {
+    return registerPrepareHandler('sheet', () => setSheetOpen(true))
+  }, [registerPrepareHandler])
+
   useEffect(() => {
     if (!activeTenant) return
 
@@ -108,6 +116,7 @@ export function DashboardPage() {
     setFocusLocation(null)
     setError(null)
     setDataLoading(true)
+    setSheetOpen(false)
 
     let cancelled = false
     const load = async () => {
@@ -161,6 +170,8 @@ export function DashboardPage() {
     try {
       const result = await solveFromDb(activeTenant.id, todayDate)
       setSolveResult(result)
+      // Auto-open sheet on mobile after solve completes
+      setSheetOpen(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Optimization failed')
     } finally {
@@ -188,10 +199,12 @@ export function DashboardPage() {
     )
   }
 
+  const panelLabel = solveResult ? 'Route Plan' : 'Dispatch'
+
   return (
-    <div className="absolute inset-0 flex">
-      {/* Map */}
-      <div className="flex-1 relative">
+    <div className="absolute inset-0 flex flex-col lg:flex-row">
+      {/* Map area */}
+      <div className="flex-1 relative min-h-0" data-tour="dashboard-map">
         <RouteMap
           locations={mapLocations}
           depotIds={depotIds}
@@ -211,9 +224,12 @@ export function DashboardPage() {
           </div>
         )}
 
-        {/* Floating optimize bar */}
+        {/* Floating optimize button */}
         {!solveResult && !dataLoading && jobs.length > 0 && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[450]">
+          <div
+            className="absolute z-[450] left-1/2 -translate-x-1/2 bottom-24 lg:bottom-6"
+            data-tour="optimize-button"
+          >
             <button
               onClick={handleOptimize}
               disabled={loading}
@@ -250,7 +266,7 @@ export function DashboardPage() {
 
         {/* Error banner */}
         {error && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[450] max-w-md w-full">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[450] max-w-md w-full px-4">
             <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 shadow-lg flex items-start gap-3">
               <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
@@ -270,10 +286,49 @@ export function DashboardPage() {
             </div>
           </div>
         )}
+
+        {/* Mobile sheet toggle tab — visible when sheet is closed */}
+        <button
+          onClick={() => setSheetOpen(true)}
+          className={`
+            lg:hidden absolute bottom-0 left-1/2 -translate-x-1/2 z-[490]
+            flex items-center gap-2 bg-white rounded-t-2xl shadow-lg
+            px-6 py-2 border border-b-0 border-gray-200
+            text-sm font-semibold text-brand-primary
+            transition-opacity duration-200
+            ${sheetOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}
+          `}
+          aria-label="Open dispatch panel"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 15a.75.75 0 01-.53-.22l-4.25-4.25a.75.75 0 111.06-1.06L10 13.19l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25A.75.75 0 0110 15z" clipRule="evenodd" />
+          </svg>
+          {panelLabel}
+        </button>
       </div>
 
-      {/* Detail Panel */}
-      <div className="w-[360px] shrink-0">
+      {/* Detail Panel — side panel on desktop, bottom sheet on mobile */}
+      <div
+        data-tour="detail-panel"
+        className={`
+          lg:w-[360px] lg:shrink-0 lg:relative lg:translate-y-0 lg:h-auto lg:opacity-100
+          fixed bottom-0 left-0 right-0 z-[500]
+          h-[72vh]
+          transition-transform duration-300 ease-in-out
+          ${sheetOpen ? 'translate-y-0' : 'translate-y-full'}
+          lg:transition-none lg:translate-y-0
+        `}
+      >
+        {/* Sheet drag handle — mobile only */}
+        <button
+          onClick={() => setSheetOpen(false)}
+          className="lg:hidden w-full flex flex-col items-center pt-2 pb-1 bg-white rounded-t-2xl border-t border-x border-gray-200 cursor-pointer"
+          aria-label="Close panel"
+        >
+          <div className="w-10 h-1 rounded-full bg-gray-300 mb-1" />
+          <span className="text-xs text-gray-400">{panelLabel} — tap to close</span>
+        </button>
+
         <DetailPanel
           locations={mapLocations}
           vehicles={mapVehicles}
@@ -288,6 +343,15 @@ export function DashboardPage() {
           moduleData={moduleData}
         />
       </div>
+
+      {/* Mobile backdrop — tap outside sheet to close */}
+      {sheetOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-[495] bg-black/20"
+          onClick={() => setSheetOpen(false)}
+          aria-hidden="true"
+        />
+      )}
     </div>
   )
 }

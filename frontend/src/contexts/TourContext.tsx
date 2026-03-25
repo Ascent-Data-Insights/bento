@@ -30,13 +30,11 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const handlers = useRef<Partial<Record<NonNullable<TourPrepare>, PrepareHandler>>>({})
 
   const registerPrepareHandler = (type: TourPrepare, handler: PrepareHandler) => {
-    if (!type) return () => {}
     handlers.current[type] = handler
-    return () => { delete handlers.current[type as NonNullable<TourPrepare>] }
+    return () => { delete handlers.current[type] }
   }
 
   const runPrepareHandler = (type: TourPrepare) => {
-    if (!type) return
     handlers.current[type]?.()
   }
 

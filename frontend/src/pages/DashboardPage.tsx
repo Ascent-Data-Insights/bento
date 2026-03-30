@@ -102,9 +102,11 @@ export function DashboardPage() {
 
   const todayDate = getTodayDate()
 
-  // Register tour handler: open the bottom sheet when the tour needs to show the detail panel
+  // Register tour handlers for the bottom sheet
   useEffect(() => {
-    return registerPrepareHandler('sheet', () => setSheetOpen(true))
+    const unregSheet = registerPrepareHandler('sheet', () => setSheetOpen(true))
+    const unregClose = registerPrepareHandler('close-sheet', () => setSheetOpen(false))
+    return () => { unregSheet(); unregClose() }
   }, [registerPrepareHandler])
 
   useEffect(() => {

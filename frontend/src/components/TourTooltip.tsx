@@ -16,6 +16,8 @@ const TOOLTIP_WIDTH = 300
 const TOOLTIP_OFFSET = 12
 const PADDING = 12
 
+const TOOLTIP_HEIGHT_ESTIMATE = 280
+
 function getTooltipPosition(
   target: Rect,
   placement: TourPlacement,
@@ -25,11 +27,18 @@ function getTooltipPosition(
   const isMobile = vw < 1024
 
   if (isMobile) {
+    const centeredLeft = Math.max(PADDING, (vw - TOOLTIP_WIDTH) / 2)
+    // For 'top' placement (e.g. optimize button near bottom), prefer above target
+    if (placement === 'top') {
+      const above = target.top - TOOLTIP_HEIGHT_ESTIMATE - TOOLTIP_OFFSET
+      const fitsAbove = above >= PADDING
+      if (fitsAbove) return { top: above, left: centeredLeft }
+    }
     const below = target.top + target.height + TOOLTIP_OFFSET
-    const fitsBelow = below + 220 < vh
+    const fitsBelow = below + TOOLTIP_HEIGHT_ESTIMATE < vh
     return {
-      top: fitsBelow ? below : Math.max(PADDING, target.top - 220 - TOOLTIP_OFFSET),
-      left: Math.max(PADDING, (vw - TOOLTIP_WIDTH) / 2),
+      top: fitsBelow ? below : Math.max(PADDING, target.top - TOOLTIP_HEIGHT_ESTIMATE - TOOLTIP_OFFSET),
+      left: centeredLeft,
     }
   }
 
@@ -62,7 +71,7 @@ function getTooltipPosition(
   }
 
   left = Math.max(PADDING, Math.min(left, vw - TOOLTIP_WIDTH - PADDING))
-  top = Math.max(PADDING, Math.min(top, vh - 220 - PADDING))
+  top = Math.max(PADDING, Math.min(top, vh - TOOLTIP_HEIGHT_ESTIMATE - PADDING))
 
   return { top, left }
 }
@@ -99,7 +108,12 @@ export function TourTooltip() {
 
   const measureTarget = useCallback(() => {
     if (!currentStep) return
-    const el = document.querySelector<HTMLElement>(`[data-tour="${currentStep.id}"]`)
+    // Pick the first element with this tour id that is actually visible on screen
+    const els = document.querySelectorAll<HTMLElement>(`[data-tour="${currentStep.id}"]`)
+    const el = Array.from(els).find((e) => {
+      const r = e.getBoundingClientRect()
+      return r.width > 0 && r.height > 0 && r.top >= 0 && r.left >= 0
+    }) ?? els[0] ?? null
     if (!el) { setTargetRect(null); return }
     const r = el.getBoundingClientRect()
     setVp({ w: window.innerWidth, h: window.innerHeight })
@@ -124,18 +138,28 @@ export function TourTooltip() {
         await new Promise((r) => setTimeout(r, 120))
       }
 
-      // Step 2: run the prepare action (open sidebar, open sheet, etc.)
-      if (currentStep.prepare) {
-        // On desktop, sidebar is always visible — skip open/close-sidebar
-        if (isMobile || (currentStep.prepare !== 'sidebar' && currentStep.prepare !== 'close-sidebar')) {
-          runPrepareHandler(currentStep.prepare)
-          // Wait for animation/transition to settle
-          await new Promise((r) => setTimeout(r, 320))
+      // Step 2: run prepare actions in order (open sidebar, close sheet, etc.)
+      const sidebarActions = new Set<string>(['sidebar', 'close-sidebar'])
+      if (currentStep.prepare?.length) {
+        let needsWait = false
+        for (const action of currentStep.prepare) {
+          // On desktop, sidebar is always visible — skip sidebar open/close
+          if (!isMobile && sidebarActions.has(action)) continue
+          runPrepareHandler(action)
+          needsWait = true
+        }
+        if (needsWait) {
+          // Wait for HeadlessUI dialog (300ms) + animation to fully settle
+          await new Promise((r) => setTimeout(r, 450))
         }
       }
 
-      // Step 3: measure the target element
-      const el = document.querySelector<HTMLElement>(`[data-tour="${currentStep.id}"]`)
+      // Step 3: measure the target element (prefer visible/on-screen element)
+      const els = document.querySelectorAll<HTMLElement>(`[data-tour="${currentStep.id}"]`)
+      const el = Array.from(els).find((e) => {
+        const r = e.getBoundingClientRect()
+        return r.width > 0 && r.height > 0 && r.top >= 0 && r.left >= 0
+      }) ?? els[0] ?? null
       if (el) {
         const rect = el.getBoundingClientRect()
         setVp({ w: window.innerWidth, h: window.innerHeight })

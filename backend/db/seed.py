@@ -288,6 +288,7 @@ def seed_fresh_fleet(db, seed_date: date) -> None:
         compartments=[
             {"type": "refrigerated", "capacity": {"weight": 300, "volume": 20}},
             {"type": "ambient", "capacity": {"weight": 200, "volume": 15}},
+            {"type": "cab", "capacity": {"seats": 1}},
         ],
     )
     van2 = Vehicle(
@@ -296,6 +297,7 @@ def seed_fresh_fleet(db, seed_date: date) -> None:
         compartments=[
             {"type": "refrigerated", "capacity": {"weight": 200, "volume": 15}},
             {"type": "ambient", "capacity": {"weight": 300, "volume": 20}},
+            {"type": "cab", "capacity": {"seats": 1}},
         ],
     )
     van3 = Vehicle(
@@ -303,6 +305,7 @@ def seed_fresh_fleet(db, seed_date: date) -> None:
         start_location_id=warehouse.id, end_location_id=warehouse.id,
         compartments=[
             {"type": "ambient", "capacity": {"weight": 400, "volume": 30}},
+            {"type": "cab", "capacity": {"seats": 1}},
         ],
     )
     db.add_all([van1, van2, van3])
@@ -348,6 +351,22 @@ def seed_fresh_fleet(db, seed_date: date) -> None:
     ]
     db.add_all(packages)
 
+    # Resources — drivers
+    drivers = []
+    for name in ["Carlos", "Priya", "James"]:
+        d = Resource(
+            tenant_id=tenant.id,
+            name=name,
+            pickup_location_id=warehouse.id,
+            compartment_types=["cab"],
+            capacity_consumption={"seats": 1},
+            stays_with_vehicle=True,
+            attributes={"role": "driver"},
+            quantity=1,
+        )
+        drivers.append(d)
+    db.add_all(drivers)
+
     # Jobs — one delivery per location
     delivery_locs = [martinez, chen, patel, thompson, williams, garcia]
     delivery_names = [
@@ -379,7 +398,7 @@ def seed_fresh_fleet(db, seed_date: date) -> None:
 
     db.commit()
     print(f"Seeded Fresh Fleet Delivery (tenant_id: {tenant.id})")
-    print(f"  - 7 locations, 3 vehicles, 6 resources, 6 jobs for {seed_date}")
+    print(f"  - 7 locations, 3 vehicles, 9 resources, 6 jobs for {seed_date}")
 
 
 def seed(target_date: date | None = None) -> None:

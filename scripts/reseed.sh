@@ -44,6 +44,8 @@ SELECT pg_terminate_backend(pid)
 DROP DATABASE IF EXISTS :"dbname";
 CREATE DATABASE :"dbname";
 GRANT ALL PRIVILEGES ON DATABASE :"dbname" TO :"dbuser";
+\connect :"dbname"
+GRANT ALL ON SCHEMA public TO :"dbuser";
 SQL
 
 # --- Run migrations ---
